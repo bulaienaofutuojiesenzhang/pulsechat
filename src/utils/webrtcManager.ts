@@ -4,12 +4,10 @@ import {
     RTCSessionDescription,
 } from 'react-native-webrtc';
 import EventEmitter from 'events';
+import { STUN_SERVERS } from '../config';
 
 const ICE_SERVERS = {
-    iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-    ]
+    iceServers: STUN_SERVERS
 };
 
 class WebRTCManager extends EventEmitter {

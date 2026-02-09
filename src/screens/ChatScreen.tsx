@@ -12,7 +12,8 @@ import { webrtcManager } from '../utils/webrtcManager';
 import { saveMessage, getMessages } from '../utils/storage';
 import { setActivePeerId } from '../utils/GlobalMessageListener';
 import { resetUnreadCount, updatePeerName } from '../store/slices/chatSlice';
-import { signalingManager } from '../utils/signalingManager';
+import { hybridSignalingManager } from '../utils/hybridSignalingManager';
+import { COMMUNICATION_MODE } from '../config';
 
 // 兼容性解决：简单的信令编码工具
 const encodeSignal = (obj: any) => {
@@ -37,7 +38,8 @@ const ChatScreen = () => {
     const [inputText, setInputText] = useState('');
     const [showMore, setShowMore] = useState(false);
     const [isVoiceMode, setIsVoiceMode] = useState(false);
-    const [connStatus, setConnStatus] = useState<'connected' | 'disconnected' | 'connecting'>(signalingManager.getConnectionStatus(peerId) as any);
+    const [connStatus, setConnStatus] = useState<'connected' | 'disconnected' | 'connecting'>(hybridSignalingManager.getConnectionStatus(peerId) as any);
+    const [connMode, setConnMode] = useState<string>(hybridSignalingManager.getCurrentMode(peerId));
 
     const userState = useSelector((state: RootState) => (state as any).user);
     const peers = useSelector((state: RootState) => state.chat.peers);
@@ -91,23 +93,23 @@ const ChatScreen = () => {
         };
 
         // 初始进入时，如果没有连接，尝试扫描一次
-        if (signalingManager.getConnectionStatus(peerId) === 'disconnected') {
+        if (hybridSignalingManager.getConnectionStatus(peerId) === 'disconnected') {
             if (profile?.id) {
-                signalingManager.start(profile.id, profile.name);
+                hybridSignalingManager.start(profile.id, profile.name);
             }
         }
 
         p2pService.on('message', handleMsg);
         p2pService.on('refresh', handleRefresh);
-        signalingManager.on('error', handleSignalingError);
-        signalingManager.on('statusChange', handleStatusChange);
+        hybridSignalingManager.on('error', handleSignalingError);
+        hybridSignalingManager.on('statusChange', handleStatusChange);
 
         return () => {
             setActivePeerId(null);
             p2pService.off('message', handleMsg);
             p2pService.off('refresh', handleRefresh);
-            signalingManager.off('error', handleSignalingError);
-            signalingManager.off('statusChange', handleStatusChange);
+            hybridSignalingManager.off('error', handleSignalingError);
+            hybridSignalingManager.off('statusChange', handleStatusChange);
         };
     }, [peerId, dispatch, profile?.id]);
 
@@ -300,7 +302,7 @@ const ChatScreen = () => {
                         {displayName}
                     </Text>
                     <Text style={{ fontSize: 10, color: isOnline ? '#07C160' : '#FA5151' }}>
-                        {isOnline ? '● 在线' : '○ 寻找节点中...'}
+                        {isOnline ? `● 在线 (${connMode === COMMUNICATION_MODE.LAN ? '局域网' : '互联网'})` : '○ 寻找节点中...'}
                     </Text>
                 </TouchableOpacity>
             ),

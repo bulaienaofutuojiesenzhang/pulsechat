@@ -5,7 +5,7 @@ import Ionicons from '@react-native-vector-icons/ionicons';
 import { useNavigation } from '@react-navigation/native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
-import { signalingManager } from '../utils/signalingManager';
+import { hybridSignalingManager } from '../utils/hybridSignalingManager';
 import { upsertPeer, updatePeerName } from '../store/slices/chatSlice';
 
 const HomeScreen = () => {
@@ -27,15 +27,15 @@ const HomeScreen = () => {
 
     React.useEffect(() => {
         if (profile?.id) {
-            signalingManager.start(profile.id, profile.name);
+            hybridSignalingManager.start(profile.id, profile.name);
 
             const handlePeerFound = (peer: any) => {
                 dispatch(upsertPeer(peer));
             };
 
-            signalingManager.on('peerFound', handlePeerFound);
+            hybridSignalingManager.on('peerFound', handlePeerFound);
             return () => {
-                signalingManager.off('peerFound', handlePeerFound);
+                hybridSignalingManager.off('peerFound', handlePeerFound);
                 // 注意：不要在卸载时 stop signaling，否则后台接收不到消息
                 // 除非是彻底退出应用
             };

@@ -16,7 +16,7 @@ import { useNavigation } from '@react-navigation/native';
 import { RootState } from '../store';
 import { clearProfile } from '../store/slices/userSlice';
 import { resetChat } from '../store/slices/chatSlice';
-import { signalingManager } from '../utils/signalingManager';
+import { hybridSignalingManager } from '../utils/hybridSignalingManager';
 
 const ProfileScreen = () => {
     const navigation = useNavigation() as any;
@@ -75,7 +75,7 @@ const ProfileScreen = () => {
                     text: '退出',
                     style: 'destructive',
                     onPress: () => {
-                        signalingManager.stop();
+                        hybridSignalingManager.stop();
                         dispatch(clearProfile());
                         dispatch(resetChat());
                     },
