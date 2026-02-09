@@ -47,7 +47,7 @@ const HomeScreen = ({ navigation }) => {
                             bottomDivider
                             onPress={() => navigation.navigate('Chat', { peerId: item.id, peerName: item.name })}
                         >
-                            <Icon name="person" />
+                            <Icon iconProps={{ name: "person" }} />
                             <ListItem.Content>
                                 <ListItem.Title>{item.name || '未知节点'}</ListItem.Title>
                                 <ListItem.Subtitle>{item.id.substring(0, 20)}...</ListItem.Subtitle>
@@ -58,13 +58,13 @@ const HomeScreen = ({ navigation }) => {
                 />
             ) : (
                 <View style={styles.emptyContainer}>
-                    <Icon name="radar" type="material-community" size={60} color="#ccc" />
+                    <Icon iconProps={{ name: "search", size: 60, color: "#ccc" }} />
                     <Text style={styles.emptyText}>正在发现附近的节点...</Text>
                 </View>
             )}
 
             <FAB
-                icon={{ name: 'add', color: 'white' }}
+                icon={<Icon iconProps={{ name: 'add', color: 'white' }} />}
                 color="#2089dc"
                 placement="right"
                 title="开始新对话"
