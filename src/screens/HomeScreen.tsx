@@ -15,11 +15,15 @@ const HomeScreen = () => {
     const peers = useSelector((state: RootState) => state.chat.peers);
     const [search, setSearch] = useState('');
 
-    const peerList = Object.values(peers).sort((a, b) => {
-        const timeA = a.lastMessage?.timestamp || 0;
-        const timeB = b.lastMessage?.timestamp || 0;
-        return timeB - timeA;
-    });
+    const peerList = React.useMemo(() => {
+        return Object.values(peers)
+            .filter(p => p.id !== profile?.id && p.id !== '') // 强力过滤自己和空节点
+            .sort((a, b) => {
+                const timeA = a.lastMessage?.timestamp || 0;
+                const timeB = b.lastMessage?.timestamp || 0;
+                return timeB - timeA;
+            });
+    }, [peers, profile?.id]);
 
     React.useEffect(() => {
         if (profile?.id) {

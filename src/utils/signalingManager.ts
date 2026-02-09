@@ -11,6 +11,8 @@ class SignalingManager extends EventEmitter {
     private server: any;
     private clients: Map<string, any> = new Map();
     private clientStatus: Map<string, 'connecting' | 'connected' | 'disconnected'> = new Map();
+    private heartbeats: Map<string, number> = new Map();
+    private heartbeatInterval: any = null;
     private port: number = 45678;
     private readonly BASE_PORT = 45678;
     private readonly MAX_PORT_RETRIES = 5;
@@ -57,8 +59,14 @@ class SignalingManager extends EventEmitter {
                 const port = service.port;
 
                 if (host && port) {
-                    console.log('[Zeroconf] 我是发起方，尝试建立信令连接:', peerId, host, port);
-                    this.connectToPeerSignaling(peerId, host, port);
+                    // 如果已经连接过这个 ID，且目前处于断连状态或地址不同，则尝试强制重连
+                    const currentClient = this.clients.get(peerId);
+                    if (currentClient) {
+                        console.log(`[SignalingManager] 节点 ${peerId} 已存在活跃连接，跳过主动握手`);
+                    } else {
+                        console.log('[Zeroconf] 我是发起方，尝试建立信令连接:', peerId, host, port);
+                        this.connectToPeerSignaling(peerId, host, port);
+                    }
                 }
             } else {
                 console.log('[Zeroconf] 我是接收方，等待对方连接:', peerId);
@@ -98,12 +106,25 @@ class SignalingManager extends EventEmitter {
                                     this.clients.set(msg.id, socket);
                                     this.clientStatus.set(msg.id, 'connected');
                                     this.emit('statusChange', { peerId: msg.id, status: 'connected' });
+
+                                    // 服务器端向客户端回发 identify，告诉对方自己的身份
+                                    socket.write(JSON.stringify({ type: 'identify', id: this.myId, name: this.myName }));
+
                                     if (!this.discoveredPeerIds.has(msg.id)) {
                                         this.discoveredPeerIds.add(msg.id);
                                         const defaultName = `Node-${msg.id.substring(msg.id.length - 8)}`;
                                         this.emit('peerFound', { id: msg.id, name: msg.name || defaultName });
+                                    } else {
+                                        // 如果已经发现过，但这次带了名字，也更新一下
+                                        const defaultName = `Node-${msg.id.substring(msg.id.length - 8)}`;
+                                        this.emit('peerFound', { id: msg.id, name: msg.name || defaultName });
                                     }
                                     // 服务器端在收到身份后，不主动发 offer，等待对方发
+                                } else if (msg.type === 'ping') {
+                                    this.heartbeats.set(msg.id || msg.from, Date.now());
+                                    socket.write(JSON.stringify({ type: 'pong', id: this.myId }));
+                                } else if (msg.type === 'pong') {
+                                    this.heartbeats.set(msg.id || msg.from, Date.now());
                                 } else if (['offer', 'answer', 'candidate'].includes(msg.type)) {
                                     webrtcManager.handleSignal(msg.from, msg);
                                 } else {
@@ -146,12 +167,25 @@ class SignalingManager extends EventEmitter {
     }
 
     private connectToPeerSignaling(peerId: string, host: string, port: number) {
-        if (this.clients.has(peerId)) return;
+        // 如果已经有这个节点的连接，先物理销毁它，迎接新连接
+        if (this.clients.has(peerId)) {
+            console.log(`[SignalingManager] 销毁存量连接以备重连: ${peerId}`);
+            const oldClient = this.clients.get(peerId);
+            try { oldClient.destroy(); } catch (e) { }
+            this.clients.delete(peerId);
+        }
 
         const client = TcpSocket.createConnection({ port, host }, () => {
+            // 如果已经有这个节点的连接，先关闭旧的
+            if (this.clients.has(peerId)) {
+                const oldSocket = this.clients.get(peerId);
+                try { oldSocket.destroy(); } catch (e) { }
+            }
+
             client.write(JSON.stringify({ type: 'identify', id: this.myId, name: this.myName }));
             this.clients.set(peerId, client);
             this.clientStatus.set(peerId, 'connected');
+            this.heartbeats.set(peerId, Date.now());
             this.emit('statusChange', { peerId, status: 'connected' });
             if (!this.discoveredPeerIds.has(peerId)) {
                 this.discoveredPeerIds.add(peerId);
@@ -179,7 +213,16 @@ class SignalingManager extends EventEmitter {
             parts.forEach(part => {
                 try {
                     const msg = JSON.parse(part);
-                    if (['offer', 'answer', 'candidate'].includes(msg.type)) {
+                    if (msg.type === 'identify') {
+                        // 客户端收到服务器的身份，更新名称
+                        this.emit('peerFound', { id: msg.id, name: msg.name });
+                        this.heartbeats.set(msg.id, Date.now());
+                    } else if (msg.type === 'ping') {
+                        this.heartbeats.set(msg.id || msg.from, Date.now());
+                        client.write(JSON.stringify({ type: 'pong', id: this.myId }));
+                    } else if (msg.type === 'pong') {
+                        this.heartbeats.set(msg.id || msg.from, Date.now());
+                    } else if (['offer', 'answer', 'candidate'].includes(msg.type)) {
                         webrtcManager.handleSignal(msg.from, msg);
                     } else {
                         p2pService.receivePayload(msg.from, msg);
@@ -224,6 +267,29 @@ class SignalingManager extends EventEmitter {
         this.myId = myId;
         this.myName = myName;
         this.discoveredPeerIds.clear();
+
+        // 启动心跳检查
+        if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+        this.heartbeatInterval = setInterval(() => {
+            const now = Date.now();
+            this.clients.forEach((client, peerId) => {
+                // 发送 Ping
+                try {
+                    client.write(JSON.stringify({ type: 'ping', from: this.myId }));
+                } catch (e) { }
+
+                // 检查超时 (20秒没心跳则断开)
+                const last = this.heartbeats.get(peerId) || 0;
+                if (now - last > 20000) {
+                    console.log(`[SignalingManager] 与 ${peerId} 心跳超时，关闭连接`);
+                    try { client.destroy(); } catch (e) { }
+                    this.clients.delete(peerId);
+                    this.clientStatus.set(peerId, 'disconnected');
+                    this.emit('statusChange', { peerId, status: 'disconnected' });
+                }
+            });
+        }, 8000);
+
         try {
             await this.startServer();
             try {
@@ -234,6 +300,7 @@ class SignalingManager extends EventEmitter {
     }
 
     stop() {
+        if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
         try {
             this.zeroconf.stop();
             this.zeroconf.unpublishService(`pulsechat_${this.myId}`);

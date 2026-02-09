@@ -63,14 +63,10 @@ const ChatScreen = () => {
 
         const handleMsg = (msg: any) => {
             if (msg.from === currentPeerId.current) {
-                const incomingMsg = {
-                    ...msg,
-                    isMe: false,
-                    id: msg.id || Date.now().toString() + Math.random().toString(36).substring(7)
-                };
                 setMessages(prev => {
-                    if (prev.some(m => m.id === incomingMsg.id)) return prev;
-                    return [...prev, incomingMsg];
+                    const exists = prev.some(m => m.id === msg.data.id);
+                    if (exists) return prev;
+                    return [...prev, msg.data];
                 });
             }
         };
@@ -128,7 +124,11 @@ const ChatScreen = () => {
             isMe: true,
         };
 
-        setMessages(prev => [...prev, newMessage]);
+        setMessages(prev => {
+            const exists = prev.some(m => m.id === newMessage.id);
+            if (exists) return prev;
+            return [...prev, newMessage];
+        });
         // 持久化
         if (profile?.id) {
             saveMessage(profile.id, peerId, newMessage);
@@ -158,7 +158,11 @@ const ChatScreen = () => {
                     timestamp: Date.now(),
                     isMe: true,
                 };
-                setMessages(prev => [...prev, newMessage]);
+                setMessages(prev => {
+                    const exists = prev.some(m => m.id === newMessage.id);
+                    if (exists) return prev;
+                    return [...prev, newMessage];
+                });
                 if (profile?.id) {
                     saveMessage(profile.id, peerId, newMessage);
                 }

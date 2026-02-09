@@ -34,10 +34,9 @@ const chatSlice = createSlice({
             if (!state.peers[id]) {
                 state.peers[id] = { id, name, unreadCount: 0 };
             } else {
-                // 只有当现有名称为默认生成的 "Node-..." 或 "未知节点" 时，才允许被信令传来的名字覆盖
-                // 如果用户已经手动改了名字，则保留用户的备注
-                const currentName = state.peers[id].name;
-                if (!currentName || currentName.startsWith('Node-') || currentName === '未知节点' || currentName === '新朋友') {
+                // 如果已存在节点，且传入了非 Node- 开头的有效名称，则更新
+                const oldName = state.peers[id].name;
+                if (name && name !== oldName && !name.startsWith('Node-')) {
                     state.peers[id].name = name;
                 }
             }
