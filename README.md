@@ -1,79 +1,77 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# 纯对话 - pulsechat (简称: Pchat)
 
-# Getting Started
+React Native 移动端纯 P2P 加密聊天应用，支持跨端同步删除消息。
 
->**Note**: Make sure you have completed the [React Native - Environment Setup](https://reactnative.dev/docs/environment-setup) instructions till "Creating a new application" step, before proceeding.
+---
 
-## Step 1: Start the Metro Server
+## 👨‍💻 作者信息
 
-First, you will need to start **Metro**, the JavaScript _bundler_ that ships _with_ React Native.
+- **作者**: [追风俊码 - 布莱恩·奥弗托·杰森张]
+- **GitHub**: [[追风俊码](https://github.com/bulaienaofutuojiesenzhang)]
+- **抖音号**: [[追风俊码](https://v.douyin.com/61z583eMUps)]
+- **B站号**: [[追风俊码](https://b23.tv/A7lfRgE)]
+- **快手号**: [[追风俊码](https://v.kuaishou.com/nSIIvD61)]
 
-To start Metro, run the following command from the _root_ of your React Native project:
+---
 
-```bash
-# using npm
-npm start
+## 🚀 要实现的功能
 
-# OR using Yarn
-yarn start
-```
+| 模块 | 选型 | 作用 |
+| :--- | :--- | :--- |
+| **RN基础** | React Native 0.76.x | 移动端跨端渲染 |
+| **P2P传输** | `react-native-webrtc` + STUN | WebRTC DataChannel P2P 直连、NAT 穿透 |
+| **P2P信令发现** | `react-native-zeroconf` / DHT | 节点发现，无中心服务器 |
+| **加密** | `react-native-libsodium` | Ed25519 身份认证、X25519 密钥协商、AES-256-GCM 消息加密 |
+| **本地存储** | `react-native-mmkv` | 端侧加密存储聊天记录，高性能 |
+| **消息同步** | 自定义 P2P 控制指令 | 消息删除指令跨节点同步、状态校验 |
 
-## Step 2: Start your Application
+*灵感来源：小飞机 (Telegram) & 快播*
 
-Let Metro Bundler run in its _own_ terminal. Open a _new_ terminal from the _root_ of your React Native project. Run the following command to start your _Android_ or _iOS_ app:
+---
 
-### For Android
+## 🛠 技术栈
 
-```bash
-# using npm
-npm run android
+| 类别 | 技术 | 版本 |
+| :--- | :--- | :--- |
+| **框架** | React Native | 0.76.1 |
+| **React** | React | 18.3.1 |
+| **语言** | TypeScript (宽松模式) | 5.x |
+| **状态管理** | Redux Toolkit + React Redux | ^2.11.2 / ^9.2.0 |
+| **持久化** | Redux Persist | ^6.0.0 |
+| **导航** | React Navigation | ^7.x |
+| **UI组件库** | RNEUI (React Native Elements) | ^5.0.0 |
+| **本地存储** | MMKV / AsyncStorage | ^4.1.2 / ^2.2.0 |
 
-# OR using Yarn
-yarn android
-```
+---
 
-### For iOS
+## ⌨️ 常用开发命令
 
-```bash
-# using npm
-npm run ios
+注意：建议使用 `npm` (根据 `package.json` 脚本)。
 
-# OR using Yarn
-yarn ios
-```
+### 安卓 (Android)
+- **运行应用**: `npm run android`
+- **清理构建**: `cd android && ./gradlew clean`
+- **打包 APK**: `cd android && ./gradlew assembleRelease`
+- **停止 Gradle 守护进程**: `cd android && ./gradlew --stop`
 
-If everything is set up _correctly_, you should see your new app running in your _Android Emulator_ or _iOS Simulator_ shortly provided you have set up your emulator/simulator correctly.
+### iOS
+- **运行应用**: `npm run ios`
+- **安装依赖**: `cd ios && pod install`
 
-This is one way to run your app — you can also run it directly from within Android Studio and Xcode respectively.
+---
 
-## Step 3: Modifying your App
+## ⚠️ TypeScript 配置要求 (重要)
 
-Now that you have successfully run the app, let's modify it.
+本项目使用 **最宽松** 的 TypeScript 规则，以快速开发为优先，类型安全为次要：
 
-1. Open `App.tsx` in your text editor of choice and edit some lines.
-2. For **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Developer Menu** (<kbd>Ctrl</kbd> + <kbd>M</kbd> (on Window and Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (on macOS)) to see your changes!
+- 允许使用 `any` 类型。
+- 不强制类型注解。
+- 不强制空值检查。
+- `tsconfig.json` 已配置为关闭严格模式。
 
-   For **iOS**: Hit <kbd>Cmd ⌘</kbd> + <kbd>R</kbd> in your iOS Simulator to reload the app and see your changes!
+---
 
-## Congratulations! :tada:
+## 💡 开发环境注意事项
 
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [Introduction to React Native](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you can't get this to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+1. **Gradle 构建**: 如果遇到 `react-native-mmkv` 或 `react-native-nitro-modules` 构建失败，请检查 `NitroModulesPackage.kt` 中的 `ReactModuleInfo` 构造函数调用（RN 0.76+ 移除了命名参数支持）。
+2. **Yoga/SVG 兼容性**: 在 RN 0.76 中，`react-native-svg` 可能会遇到 Yoga 命名空间相关的编译错误（如 `StyleSizeLength` 缺失），需要手动修正。
