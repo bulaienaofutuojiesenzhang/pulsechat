@@ -41,21 +41,27 @@ React Native 移动端纯 P2P 加密聊天应用，支持跨端同步删除消�
 | **导航** | React Navigation | ^7.x |
 | **UI组件库** | RNEUI (React Native Elements) | ^5.0.0 |
 | **本地存储** | MMKV / AsyncStorage | ^4.1.2 / ^2.2.0 |
+| **SVG 支持** | react-native-svg | 15.12.0 (⚠️ 固定版本) |
 
 ---
 
 ## ⌨️ 常用开发命令
 
-注意：建议使用 `npm` (根据 `package.json` 脚本)。
+**⚠️ 重要：本项目使用 `yarn` 作为包管理器,不要使用 npm!**
+
+### 包管理
+- **安装依赖**: `yarn install`
+- **添加包**: `yarn add <package>`
+- **删除包**: `yarn remove <package>`
 
 ### 安卓 (Android)
-- **运行应用**: `npm run android`
+- **运行应用**: `yarn android`
 - **清理构建**: `cd android && ./gradlew clean`
 - **打包 APK**: `cd android && ./gradlew assembleRelease`
 - **停止 Gradle 守护进程**: `cd android && ./gradlew --stop`
 
 ### iOS
-- **运行应用**: `npm run ios`
+- **运行应用**: `yarn ios`
 - **安装依赖**: `cd ios && pod install`
 
 ---
@@ -73,5 +79,6 @@ React Native 移动端纯 P2P 加密聊天应用，支持跨端同步删除消�
 
 ## 💡 开发环境注意事项
 
-1. **Gradle 构建**: 如果遇到 `react-native-mmkv` 或 `react-native-nitro-modules` 构建失败，请检查 `NitroModulesPackage.kt` 中的 `ReactModuleInfo` 构造函数调用（RN 0.76+ 移除了命名参数支持）。
-2. **Yoga/SVG 兼容性**: 在 RN 0.76 中，`react-native-svg` 可能会遇到 Yoga 命名空间相关的编译错误（如 `StyleSizeLength` 缺失），需要手动修正。
+1. **包管理器**: 必须使用 `yarn`,不要使用 `npm`。
+2. **react-native-svg 版本锁定**: 必须使用 `15.12.0` 版本,不要升级到 `15.13.0+`。原因是 RN 0.76.1 的 Yoga 3.0 移除了 `StyleSizeLength` API,导致新版本编译失败。
+3. **Gradle 构建**: 如果遇到 `react-native-mmkv` 或 `react-native-nitro-modules` 构建失败,请检查 `NitroModulesPackage.kt` 中的 `ReactModuleInfo` 构造函数调用(RN 0.76+ 移除了命名参数支持)。

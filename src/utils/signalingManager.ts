@@ -82,7 +82,8 @@ class SignalingManager extends EventEmitter {
     start(myId: string) {
         this.myId = myId;
         this.startServer();
-        this.zeroconf.publish('http', 'tcp', 'local.', `pulsechat_${myId}`, this.port);
+        // 使用 publishService 而非 publish
+        this.zeroconf.publishService('http', 'tcp', 'local.', `pulsechat_${myId}`, this.port);
         this.zeroconf.scan('http', 'tcp', 'local.');
     }
 
