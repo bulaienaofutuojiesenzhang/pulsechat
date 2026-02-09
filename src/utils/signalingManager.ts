@@ -59,21 +59,38 @@ class SignalingManager extends EventEmitter {
         try {
             await new Promise<void>((resolve, reject) => {
                 this.server = TcpSocket.createServer((socket) => {
+                    let buffer = '';
                     socket.on('data', (data) => {
-                        try {
-                            const msg = JSON.parse(data.toString());
-                            if (msg.type === 'identify') {
-                                this.clients.set(msg.id, socket);
-                                this.emit('peerFound', { id: msg.id, name: msg.name || 'Peer' });
-                                // 发现新节点后，主动发起 WebRTC Offer 尝试打洞
-                                webrtcManager.makeOffer(msg.id);
-                            } else {
-                                // 处理 WebRTC 握手信号
-                                webrtcManager.handleSignal(msg.from, msg);
+                        buffer += data.toString();
+                        // 处理可能粘在一起的 JSON 对象
+                        let boundary = buffer.lastIndexOf('}');
+                        if (boundary === -1) return;
+
+                        const content = buffer.substring(0, boundary + 1);
+                        buffer = buffer.substring(boundary + 1);
+
+                        // 简单的分割逻辑：按 } 后的 { 分割
+                        const parts = content.split('}{').map((p, i, a) => {
+                            if (a.length === 1) return p;
+                            if (i === 0) return p + '}';
+                            if (i === a.length - 1) return '{' + p;
+                            return '{' + p + '}';
+                        });
+
+                        parts.forEach(part => {
+                            try {
+                                const msg = JSON.parse(part);
+                                if (msg.type === 'identify') {
+                                    this.clients.set(msg.id, socket);
+                                    this.emit('peerFound', { id: msg.id, name: msg.name || 'Peer' });
+                                    webrtcManager.makeOffer(msg.id);
+                                } else {
+                                    p2pService.handleSignal(msg.from, msg);
+                                }
+                            } catch (e) {
+                                console.error('[SignalingManager] 分段解析错误:', e, part);
                             }
-                        } catch (e) {
-                            console.error('[SignalingManager] 解析消息错误:', e);
-                        }
+                        });
                     });
                     socket.on('error', (err) => console.log('[SignalingManager] Socket 错误:', err));
                 });
