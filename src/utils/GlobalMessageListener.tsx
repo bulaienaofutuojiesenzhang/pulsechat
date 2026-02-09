@@ -14,6 +14,17 @@ export const setActivePeerId = (id: string | null) => {
 const GlobalMessageListener: React.FC = () => {
     const dispatch = useDispatch();
     const profile = useSelector((state: RootState) => (state as any).user?.profile);
+    const passphrase = useSelector((state: RootState) => (state as any).user?.passphrase);
+
+    // 同步全局密钥到 P2P 服务
+    useEffect(() => {
+        if (passphrase) {
+            p2pService.setGlobalPassphrase(passphrase);
+        }
+        if (profile?.id) {
+            p2pService.setMyId(profile.id);
+        }
+    }, [passphrase, profile?.id]);
 
     useEffect(() => {
         const handleIncomingMessage = (msg: any) => {
@@ -36,10 +47,13 @@ const GlobalMessageListener: React.FC = () => {
             }));
 
             // 2. 持久化到存储
-            saveMessage(peerId, structuredMsg);
+            if (profile?.id) {
+                saveMessage(profile.id, peerId, structuredMsg);
+            }
 
             // 3. 确保该节点在列表中（防止新节点发来消息没在列表显示）
-            dispatch(upsertPeer({ id: peerId, name: msg.senderName || '新朋友' }));
+            const defaultName = `Node-${peerId.substring(peerId.length - 8)}`;
+            dispatch(upsertPeer({ id: peerId, name: msg.senderName || defaultName }));
         };
 
         p2pService.on('message', handleIncomingMessage);

@@ -7,7 +7,8 @@ const CHUNK_SIZE = 16384; // 16KB per chunk to be safe with RTCDataChannel
 
 class P2PService extends EventEmitter {
     private fileBuffers: Map<string, { chunks: string[], total: number, type: string }> = new Map();
-    private encryptionKeys: Map<string, string> = new Map(); // peerId -> key
+    private globalPassphrase: string = '123456';
+    private myId: string = '';
 
     constructor() {
         super();
@@ -17,21 +18,21 @@ class P2PService extends EventEmitter {
     }
 
     /**
-     * 为指定联系人设置加解密密钥
+     * 设置全局加解密密钥 (Passphrase)
      */
-    setEncryptionKey(peerId: string, key: string) {
-        console.log(`[P2P] 设置密钥: ${peerId} -> ${key}`);
-        this.encryptionKeys.set(peerId, key);
+    setGlobalPassphrase(key: string) {
+        console.log(`[P2P] 设置全局密钥: ${key}`);
+        this.globalPassphrase = key;
     }
 
-    private getEncryptionKey(peerId: string): string {
-        return this.encryptionKeys.get(peerId) || '';
+    setMyId(id: string) {
+        this.myId = id;
     }
 
     async sendPayload(to: string, payload: any) {
         // 对聊天内容进行加密（如果类型是 chat 且消息有文本）
         let finalPayload = payload;
-        const key = this.getEncryptionKey(to);
+        const key = this.globalPassphrase;
 
         if (payload.type === 'chat' && payload.text && key) {
             finalPayload = {
@@ -54,7 +55,7 @@ class P2PService extends EventEmitter {
     async sendFile(to: string, base64Data: string, fileType: 'image' | 'audio') {
         const fileId = Math.random().toString(36).substring(7);
         const totalChunks = Math.ceil(base64Data.length / CHUNK_SIZE);
-        const key = this.getEncryptionKey(to);
+        const key = this.globalPassphrase;
 
         console.log(`[P2P] 开始发送 ${fileType}, 大小: ${base64Data.length}, 分片数: ${totalChunks}`);
 
@@ -82,7 +83,7 @@ class P2PService extends EventEmitter {
     }
 
     public receivePayload(from: string, data: any) {
-        const key = this.getEncryptionKey(from);
+        const key = this.globalPassphrase;
         let processedData = data;
 
         // 如果是加密消息，尝试解密
@@ -102,7 +103,9 @@ class P2PService extends EventEmitter {
             this.emit('message', { from, ...processedData });
         } else if (processedData.type === 'delete_all') {
             console.log(`[P2P] 收到来自 ${from} 的远程销毁指令`);
-            clearMessages(from);
+            if (this.myId) {
+                clearMessages(this.myId, from);
+            }
             this.emit('refresh');
         }
     }
@@ -118,7 +121,7 @@ class P2PService extends EventEmitter {
         const buffer = this.fileBuffers.get(key)!;
 
         // 分片解密
-        const encryptionKey = this.getEncryptionKey(from);
+        const encryptionKey = this.globalPassphrase;
         let finalChunk = chunk;
         if (isEncrypted && encryptionKey) {
             finalChunk = XORCrypto.decrypt(chunk, encryptionKey);
@@ -146,7 +149,9 @@ class P2PService extends EventEmitter {
     async requestSyncDelete(peerId: string) {
         console.log(`[P2P] 向 ${peerId} 发送同步删除指令`);
         await this.sendPayload(peerId, { type: 'delete_all' });
-        clearMessages(peerId);
+        if (this.myId) {
+            clearMessages(this.myId, peerId);
+        }
         this.emit('refresh');
     }
 }

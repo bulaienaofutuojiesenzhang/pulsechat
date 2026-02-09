@@ -77,6 +77,15 @@ class WebRTCManager extends EventEmitter {
 
         try {
             if (signal.type === 'offer') {
+                // 检查状态，如果不是 stable 或 have-remote-offer，需要先重置
+                if (pc.signalingState !== 'stable' && pc.signalingState !== 'have-remote-offer') {
+                    console.log('[WebRTC] 收到 Offer 但状态不对，重置连接:', pc.signalingState);
+                    // 关闭旧连接，创建新连接
+                    pc.close();
+                    this.peers.delete(from);
+                    this.dataChannels.delete(from);
+                    pc = await this.createPeerConnection(from);
+                }
                 await pc.setRemoteDescription(new RTCSessionDescription(signal.offer));
                 const answer = await pc.createAnswer();
                 await pc.setLocalDescription(answer);
@@ -85,7 +94,7 @@ class WebRTCManager extends EventEmitter {
                 if (pc.signalingState === 'have-local-offer') {
                     await pc.setRemoteDescription(new RTCSessionDescription(signal.answer));
                 } else {
-                    console.log('[WebRTC] 忽略 Answer: 状态不是 have-local-offer');
+                    console.log('[WebRTC] 忽略 Answer: 状态不是 have-local-offer, 当前:', pc.signalingState);
                 }
             } else if (signal.type === 'candidate') {
                 if (pc.remoteDescription) {

@@ -10,10 +10,10 @@ import GlobalMessageListener from './src/utils/GlobalMessageListener';
 
 const theme = createTheme({
   lightColors: {
-    primary: '#2089dc',
+    primary: '#07C160',
   },
   darkColors: {
-    primary: '#080808',
+    primary: '#06AD56',
   },
   mode: 'light',
 });

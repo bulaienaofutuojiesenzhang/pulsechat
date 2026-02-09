@@ -1,8 +1,9 @@
 import { createSlice } from '@reduxjs/toolkit';
 
 const initialState = {
-  profile: null, // { id: string, publicKey: string, name: string }
+  profile: null, // { id: string, publicKey: string, privateKey: string, name: string }
   isRegistered: false,
+  passphrase: '123456', // 全局加解密密钥 (Passphrase)
 };
 
 const userSlice = createSlice({
@@ -16,6 +17,10 @@ const userSlice = createSlice({
     clearProfile(state) {
       state.profile = null;
       state.isRegistered = false;
+      state.passphrase = '123456';
+    },
+    setPassphrase(state, action) {
+      state.passphrase = action.payload;
     },
   },
 });

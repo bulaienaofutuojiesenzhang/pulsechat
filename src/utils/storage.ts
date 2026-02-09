@@ -3,9 +3,10 @@ import { MMKV } from 'react-native-mmkv';
 // MMKV v3.x 稳定版写法
 const storage = new MMKV();
 
-export const saveMessage = (peerId: string, message: any) => {
+export const saveMessage = (myId: string, peerId: string, message: any) => {
     try {
-        const key = `messages_${peerId}`;
+        if (!myId) return;
+        const key = `messages_${myId}_${peerId}`;
         const existingMessagesStr = storage.getString(key);
         let messages = existingMessagesStr ? JSON.parse(existingMessagesStr) : [];
 
@@ -21,9 +22,10 @@ export const saveMessage = (peerId: string, message: any) => {
     }
 };
 
-export const getMessages = (peerId: string) => {
+export const getMessages = (myId: string, peerId: string) => {
     try {
-        const key = `messages_${peerId}`;
+        if (!myId) return [];
+        const key = `messages_${myId}_${peerId}`;
         const messagesStr = storage.getString(key);
         return messagesStr ? JSON.parse(messagesStr) : [];
     } catch (error) {
@@ -32,9 +34,10 @@ export const getMessages = (peerId: string) => {
     }
 };
 
-export const clearMessages = (peerId: string) => {
+export const clearMessages = (myId: string, peerId: string) => {
     try {
-        storage.delete(`messages_${peerId}`);
+        if (!myId) return;
+        storage.delete(`messages_${myId}_${peerId}`);
     } catch (error) {
         console.error('[Storage] 清除消息失败:', error);
     }

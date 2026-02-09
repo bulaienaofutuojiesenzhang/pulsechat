@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, FlatList, StyleSheet, KeyboardAvoidingView, Platform, TouchableOpacity, Alert, Clipboard } from 'react-native';
-import { Input, Button, Text } from '@rneui/themed';
+import { View, FlatList, StyleSheet, KeyboardAvoidingView, Platform, TouchableOpacity, Alert, Clipboard, TextInput, Text } from 'react-native';
+import Ionicons from '@react-native-vector-icons/ionicons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSelector, useDispatch } from 'react-redux';
 import FastImage from 'react-native-fast-image';
@@ -11,7 +11,8 @@ import { p2pService } from '../utils/p2pService';
 import { webrtcManager } from '../utils/webrtcManager';
 import { saveMessage, getMessages } from '../utils/storage';
 import { setActivePeerId } from '../utils/GlobalMessageListener';
-import { resetUnreadCount } from '../store/slices/chatSlice';
+import { resetUnreadCount, updatePeerName } from '../store/slices/chatSlice';
+import { signalingManager } from '../utils/signalingManager';
 
 // 兼容性解决：简单的信令编码工具
 const encodeSignal = (obj: any) => {
@@ -36,24 +37,26 @@ const ChatScreen = () => {
     const [inputText, setInputText] = useState('');
     const [showMore, setShowMore] = useState(false);
     const [isVoiceMode, setIsVoiceMode] = useState(false);
-    const [chatKey, setChatKey] = useState('123456');
 
     const userState = useSelector((state: RootState) => (state as any).user);
+    const peers = useSelector((state: RootState) => state.chat.peers);
+    const peerInfo = peers[peerId];
     const profile = userState?.profile;
     const currentPeerId = useRef(peerId);
 
     useEffect(() => {
         currentPeerId.current = peerId;
-        p2pService.setEncryptionKey(peerId, chatKey);
-    }, [peerId, chatKey]);
+    }, [peerId]);
 
     useEffect(() => {
         setActivePeerId(peerId);
         dispatch(resetUnreadCount(peerId));
 
-        const loadHistory = () => {
-            const msgs = getMessages(peerId);
-            setMessages(msgs);
+        const loadHistory = async () => {
+            if (profile?.id) {
+                const history = await getMessages(profile.id, peerId);
+                setMessages(history);
+            }
         };
         loadHistory();
 
@@ -73,15 +76,27 @@ const ChatScreen = () => {
 
         const handleRefresh = () => loadHistory();
 
+        const handleSignalingError = (err: any) => {
+            if (err.type === 'CONNECTION_FAILED' && err.peerId === peerId) {
+                Alert.alert(
+                    '连接失败',
+                    '无法通过局域网找到该节点。请确保双方：\n1. 连接在同一个 WiFi 下\n2. 手机没有开启“热点”或切换到“数据网络”\n3. 对方应用正在运行',
+                    [{ text: '知道了' }]
+                );
+            }
+        };
+
         p2pService.on('message', handleMsg);
         p2pService.on('refresh', handleRefresh);
+        signalingManager.on('error', handleSignalingError);
 
         return () => {
             setActivePeerId(null);
             p2pService.off('message', handleMsg);
             p2pService.off('refresh', handleRefresh);
+            signalingManager.off('error', handleSignalingError);
         };
-    }, [peerId, dispatch]);
+    }, [peerId, dispatch, profile?.id]);
 
     // 发送文本消息
     const handleSend = async () => {
@@ -97,7 +112,10 @@ const ChatScreen = () => {
         };
 
         setMessages(prev => [...prev, newMessage]);
-        saveMessage(peerId, newMessage);
+        // 持久化
+        if (profile?.id) {
+            saveMessage(profile.id, peerId, newMessage);
+        }
 
         const { isMe, ...payload } = newMessage;
         await p2pService.sendPayload(peerId, payload);
@@ -120,7 +138,9 @@ const ChatScreen = () => {
                     isMe: true,
                 };
                 setMessages(prev => [...prev, newMessage]);
-                saveMessage(peerId, newMessage);
+                if (profile?.id) {
+                    saveMessage(profile.id, peerId, newMessage);
+                }
                 setShowMore(false);
                 await p2pService.sendFile(peerId, base64Data, 'image');
             } catch (e) { Alert.alert('错误', '读取图片失败'); }
@@ -191,17 +211,25 @@ const ChatScreen = () => {
         ]);
     };
 
-    // 设置密钥逻辑
-    const handleSetEncryptionKey = () => {
-        Alert.prompt('设置安全密钥', '只有双方密钥一致时才能正常读信（测试默认 123456）', [
-            { text: '取消', style: 'cancel' },
-            {
-                text: '设置',
-                onPress: (val) => {
-                    if (val) setChatKey(val);
+    // 重命名逻辑
+    const handleRename = () => {
+        Alert.prompt(
+            '修改备注',
+            '为该节点设置一个好记的名字',
+            [
+                { text: '取消', style: 'cancel' },
+                {
+                    text: '确定',
+                    onPress: (newName) => {
+                        if (newName?.trim()) {
+                            dispatch(updatePeerName({ id: peerId, name: newName.trim() }));
+                        }
+                    }
                 }
-            }
-        ], 'plain-text', chatKey);
+            ],
+            'plain-text',
+            peerInfo?.name || peerName
+        );
     };
 
     const renderItem = ({ item, index }: { item: any, index: number }) => {
@@ -237,8 +265,18 @@ const ChatScreen = () => {
     };
 
     useEffect(() => {
-        navigation.setOptions({ title: peerName || '聊天', headerStyle: { backgroundColor: '#EDEDED' }, headerShadowVisible: false });
-    }, [navigation, peerName]);
+        const displayName = peerInfo?.name || peerName || '聊天';
+        navigation.setOptions({
+            headerTitle: () => (
+                <TouchableOpacity onPress={handleRename} style={{ alignItems: 'center' }}>
+                    <Text style={{ fontSize: 17, fontWeight: '600', color: '#000' }}>{displayName}</Text>
+                    <Text style={{ fontSize: 10, color: '#999' }}>点击修改备注</Text>
+                </TouchableOpacity>
+            ),
+            headerStyle: { backgroundColor: '#EDEDED' },
+            headerShadowVisible: false
+        });
+    }, [navigation, peerInfo?.name, peerName]);
 
     return (
         <View style={styles.container}>
@@ -246,22 +284,40 @@ const ChatScreen = () => {
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
                 <View style={styles.inputBar}>
                     <TouchableOpacity style={styles.iconBtn} onPress={() => setIsVoiceMode(!isVoiceMode)}>
-                        <Text style={styles.iconText}>{isVoiceMode ? '⌨️' : '🎤'}</Text>
+                        <Ionicons name={isVoiceMode ? 'keypad-outline' : 'mic-outline'} size={24} color="#666" />
                     </TouchableOpacity>
                     {isVoiceMode ? (
-                        <TouchableOpacity style={styles.voiceRecordBtn} onPress={handleStartRecord}><Text style={styles.voiceRecordText}>[语音功能暂不可用]</Text></TouchableOpacity>
+                        <TouchableOpacity style={styles.voiceRecordBtn} onPress={handleStartRecord}>
+                            <Text style={styles.voiceRecordText}>按住 说话</Text>
+                        </TouchableOpacity>
                     ) : (
-                        <Input placeholder="" value={inputText} onChangeText={setInputText} containerStyle={styles.inputContainer} inputContainerStyle={styles.inputInner} multiline />
+                        <View style={styles.inputWrapper}>
+                            <TextInput
+                                placeholder="输入消息..."
+                                placeholderTextColor="#999"
+                                value={inputText}
+                                onChangeText={setInputText}
+                                style={styles.textInput}
+                                multiline
+                            />
+                        </View>
                     )}
-                    <TouchableOpacity style={styles.iconBtn} onPress={() => setShowMore(!showMore)}><Text style={styles.iconText}>➕</Text></TouchableOpacity>
+                    {inputText.trim() ? (
+                        <TouchableOpacity style={styles.sendBtn} onPress={handleSend}>
+                            <Text style={styles.sendBtnText}>发送</Text>
+                        </TouchableOpacity>
+                    ) : (
+                        <TouchableOpacity style={styles.iconBtn} onPress={() => setShowMore(!showMore)}>
+                            <Ionicons name="add-circle-outline" size={26} color="#666" />
+                        </TouchableOpacity>
+                    )}
                 </View>
                 {showMore && (
                     <View style={styles.morePanel}>
-                        <TouchableOpacity style={styles.panelItem} onPress={handlePickImage}><View style={styles.panelIcon}><Text style={{ fontSize: 30 }}>🖼️</Text></View><Text style={styles.panelText}>照片</Text></TouchableOpacity>
-                        <TouchableOpacity style={styles.panelItem} onPress={handleGenerateCode}><View style={styles.panelIcon}><Text style={{ fontSize: 30 }}>🔗</Text></View><Text style={styles.panelText}>连接码</Text></TouchableOpacity>
-                        <TouchableOpacity style={styles.panelItem} onPress={handleImportCode}><View style={styles.panelIcon}><Text style={{ fontSize: 30 }}>📥</Text></View><Text style={styles.panelText}>导入码</Text></TouchableOpacity>
-                        <TouchableOpacity style={styles.panelItem} onPress={handleSetEncryptionKey}><View style={styles.panelIcon}><Text style={{ fontSize: 30 }}>🔐</Text></View><Text style={styles.panelText}>设置密码</Text></TouchableOpacity>
-                        <TouchableOpacity style={styles.panelItem} onPress={handleClearAll}><View style={styles.panelIcon}><Text style={{ fontSize: 30 }}>💣</Text></View><Text style={styles.panelText}>一键焚毁</Text></TouchableOpacity>
+                        <TouchableOpacity style={styles.panelItem} onPress={handlePickImage}><View style={styles.panelIonicons}><Ionicons name="image-outline" size={28} color="#666" /></View><Text style={styles.panelText}>照片</Text></TouchableOpacity>
+                        <TouchableOpacity style={styles.panelItem} onPress={handleGenerateCode}><View style={styles.panelIonicons}><Ionicons name="link-outline" size={28} color="#666" /></View><Text style={styles.panelText}>连接码</Text></TouchableOpacity>
+                        <TouchableOpacity style={styles.panelItem} onPress={handleImportCode}><View style={styles.panelIonicons}><Ionicons name="download-outline" size={28} color="#666" /></View><Text style={styles.panelText}>导入码</Text></TouchableOpacity>
+                        <TouchableOpacity style={styles.panelItem} onPress={handleClearAll}><View style={styles.panelIonicons}><Ionicons name="trash-outline" size={28} color="#FA5151" /></View><Text style={styles.panelText}>一键焚毁</Text></TouchableOpacity>
                     </View>
                 )}
             </KeyboardAvoidingView>
@@ -290,16 +346,17 @@ const styles = StyleSheet.create({
     theirText: { color: '#000' },
     imageMsg: { width: 200, height: 150, borderRadius: 4 },
     audioBubble: { flexDirection: 'row', alignItems: 'center', minWidth: 60, paddingRight: 10 },
-    inputBar: { flexDirection: 'row', backgroundColor: '#F7F7F7', padding: 8, alignItems: 'center', borderTopWidth: 0.5, borderTopColor: '#ccc' },
-    inputContainer: { flex: 1, paddingHorizontal: 0 },
-    inputInner: { backgroundColor: '#fff', borderBottomWidth: 0, borderRadius: 4, paddingHorizontal: 10, minHeight: 40 },
-    voiceRecordBtn: { flex: 1, height: 40, backgroundColor: '#eee', borderRadius: 4, justifyContent: 'center', alignItems: 'center', marginHorizontal: 10 },
-    voiceRecordText: { fontSize: 14, color: '#999' },
-    iconBtn: { padding: 8 },
-    iconText: { fontSize: 24 },
-    morePanel: { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: '#F7F7F7', padding: 20, borderTopWidth: 0.5, borderTopColor: '#eee' },
-    panelItem: { alignItems: 'center', marginRight: 30, marginBottom: 20 },
-    panelIcon: { width: 60, height: 60, backgroundColor: '#fff', borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 5 },
+    inputBar: { flexDirection: 'row', backgroundColor: '#F7F7F7', paddingHorizontal: 8, paddingVertical: 6, alignItems: 'center', borderTopWidth: 0.5, borderTopColor: '#ddd' },
+    inputWrapper: { flex: 1, backgroundColor: '#fff', borderRadius: 6, marginHorizontal: 8, maxHeight: 100 },
+    textInput: { paddingHorizontal: 12, paddingVertical: 8, fontSize: 16, color: '#000', maxHeight: 100, minHeight: 36 },
+    voiceRecordBtn: { flex: 1, height: 36, backgroundColor: '#fff', borderRadius: 6, justifyContent: 'center', alignItems: 'center', marginHorizontal: 8 },
+    voiceRecordText: { fontSize: 14, color: '#333' },
+    iconBtn: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
+    sendBtn: { backgroundColor: '#07C160', borderRadius: 6, paddingHorizontal: 12, height: 36, justifyContent: 'center', alignItems: 'center' },
+    sendBtnText: { color: '#fff', fontSize: 15, fontWeight: '500' },
+    morePanel: { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: '#F7F7F7', padding: 15, borderTopWidth: 0.5, borderTopColor: '#eee' },
+    panelItem: { alignItems: 'center', width: 70, marginBottom: 15 },
+    panelIonicons: { width: 56, height: 56, backgroundColor: '#fff', borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginBottom: 6 },
     panelText: { fontSize: 12, color: '#666' }
 });
 

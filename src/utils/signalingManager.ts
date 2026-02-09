@@ -41,11 +41,15 @@ class SignalingManager extends EventEmitter {
     }
 
     private handleDiscoveredPeer(service: any) {
-        if (service.name && service.name.startsWith('pulsechat_') && service.name !== `pulsechat_${this.myId}`) {
-            const peerId = service.name.replace('pulsechat_', '');
+        if (service.name && service.name.startsWith('pulsechat_')) {
+            // 鲁棒性提取：ID 是 32 位 Hex 字符串，后面可能有 (2) 等 Zeroconf 自动添加的后缀
+            const match = service.name.match(/pulsechat_([0-9a-f]{32})/);
+            if (!match) return;
+            const peerId = match[1];
+
+            if (peerId === this.myId) return;
 
             // 仲裁机制：只有 ID 较小的节点负责发起主动连接
-            // 这保证了局域网内两端之间只有一条 TCP 连接，不会冲突
             if (this.myId < peerId) {
                 const host = (service.addresses && service.addresses[0]) || service.host;
                 const port = service.port;
@@ -92,7 +96,8 @@ class SignalingManager extends EventEmitter {
                                     this.clients.set(msg.id, socket);
                                     if (!this.discoveredPeerIds.has(msg.id)) {
                                         this.discoveredPeerIds.add(msg.id);
-                                        this.emit('peerFound', { id: msg.id, name: msg.name || 'Peer' });
+                                        const defaultName = `Node-${msg.id.substring(msg.id.length - 8)}`;
+                                        this.emit('peerFound', { id: msg.id, name: msg.name || defaultName });
                                     }
                                     // 服务器端在收到身份后，不主动发 offer，等待对方发
                                 } else if (['offer', 'answer', 'candidate'].includes(msg.type)) {
@@ -131,11 +136,13 @@ class SignalingManager extends EventEmitter {
         if (this.clients.has(peerId)) return;
 
         const client = TcpSocket.createConnection({ port, host }, () => {
-            client.write(JSON.stringify({ type: 'identify', id: this.myId, name: 'Peer' }));
+            const myDefaultName = `Node-${this.myId.substring(this.myId.length - 8)}`;
+            client.write(JSON.stringify({ type: 'identify', id: this.myId, name: myDefaultName }));
             this.clients.set(peerId, client);
             if (!this.discoveredPeerIds.has(peerId)) {
                 this.discoveredPeerIds.add(peerId);
-                this.emit('peerFound', { id: peerId, name: 'Peer' });
+                const defaultName = `Node-${peerId.substring(peerId.length - 8)}`;
+                this.emit('peerFound', { id: peerId, name: defaultName });
             }
             // 被动等待对方发起 Offer 或我主动发起
             webrtcManager.makeOffer(peerId);
@@ -181,6 +188,7 @@ class SignalingManager extends EventEmitter {
             client.write(JSON.stringify({ ...signal, from: this.myId }));
         } else {
             console.log(`[SignalingManager] 发送失败: 找不到节点 ${peerId} 的 TCP 连接`);
+            this.emit('error', { type: 'CONNECTION_FAILED', peerId });
         }
     }
 

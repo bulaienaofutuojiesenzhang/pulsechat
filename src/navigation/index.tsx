@@ -8,6 +8,7 @@ import { RootState } from '../store';
 import LoginScreen from '../screens/LoginScreen';
 import HomeScreen from '../screens/HomeScreen';
 import ChatScreen from '../screens/ChatScreen';
+import ProfileScreen from '../screens/ProfileScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -23,6 +24,7 @@ const RootNavigator = () => {
                     <>
                         <Stack.Screen name="Home" component={HomeScreen} />
                         <Stack.Screen name="Chat" component={ChatScreen} />
+                        <Stack.Screen name="Profile" component={ProfileScreen} />
                     </>
                 )}
             </Stack.Navigator>
