@@ -7,8 +7,10 @@ import { webrtcManager } from './webrtcManager';
 class SignalingManager extends EventEmitter {
     private zeroconf = new Zeroconf();
     private myId: string = '';
+    private myName: string = '';
     private server: any;
     private clients: Map<string, any> = new Map();
+    private clientStatus: Map<string, 'connecting' | 'connected' | 'disconnected'> = new Map();
     private port: number = 45678;
     private readonly BASE_PORT = 45678;
     private readonly MAX_PORT_RETRIES = 5;
@@ -94,6 +96,8 @@ class SignalingManager extends EventEmitter {
                                 const msg = JSON.parse(part);
                                 if (msg.type === 'identify') {
                                     this.clients.set(msg.id, socket);
+                                    this.clientStatus.set(msg.id, 'connected');
+                                    this.emit('statusChange', { peerId: msg.id, status: 'connected' });
                                     if (!this.discoveredPeerIds.has(msg.id)) {
                                         this.discoveredPeerIds.add(msg.id);
                                         const defaultName = `Node-${msg.id.substring(msg.id.length - 8)}`;
@@ -111,6 +115,15 @@ class SignalingManager extends EventEmitter {
                         });
                     });
                     socket.on('error', (err) => console.log('[SignalingManager] Socket 错误:', err));
+                    socket.on('close', () => {
+                        this.clients.forEach((val, key) => {
+                            if (val === socket) {
+                                this.clients.delete(key);
+                                this.clientStatus.set(key, 'disconnected');
+                                this.emit('statusChange', { peerId: key, status: 'disconnected' });
+                            }
+                        });
+                    });
                 });
 
                 this.server.on('error', (err: any) => {
@@ -136,9 +149,10 @@ class SignalingManager extends EventEmitter {
         if (this.clients.has(peerId)) return;
 
         const client = TcpSocket.createConnection({ port, host }, () => {
-            const myDefaultName = `Node-${this.myId.substring(this.myId.length - 8)}`;
-            client.write(JSON.stringify({ type: 'identify', id: this.myId, name: myDefaultName }));
+            client.write(JSON.stringify({ type: 'identify', id: this.myId, name: this.myName }));
             this.clients.set(peerId, client);
+            this.clientStatus.set(peerId, 'connected');
+            this.emit('statusChange', { peerId, status: 'connected' });
             if (!this.discoveredPeerIds.has(peerId)) {
                 this.discoveredPeerIds.add(peerId);
                 const defaultName = `Node-${peerId.substring(peerId.length - 8)}`;
@@ -177,8 +191,22 @@ class SignalingManager extends EventEmitter {
         });
 
         client.on('error', (err) => {
+            console.log(`[SignalingManager] 与 ${peerId} 连接错误:`, err.message);
             this.clients.delete(peerId);
+            this.clientStatus.set(peerId, 'disconnected');
+            this.emit('statusChange', { peerId, status: 'disconnected' });
         });
+
+        client.on('close', () => {
+            console.log(`[SignalingManager] 与 ${peerId} 连接关闭`);
+            this.clients.delete(peerId);
+            this.clientStatus.set(peerId, 'disconnected');
+            this.emit('statusChange', { peerId, status: 'disconnected' });
+        });
+    }
+
+    getConnectionStatus(peerId: string) {
+        return this.clientStatus.get(peerId) || 'disconnected';
     }
 
     private sendSignal(peerId: string, signal: any) {
@@ -192,8 +220,9 @@ class SignalingManager extends EventEmitter {
         }
     }
 
-    async start(myId: string) {
+    async start(myId: string, myName: string = '') {
         this.myId = myId;
+        this.myName = myName;
         this.discoveredPeerIds.clear();
         try {
             await this.startServer();

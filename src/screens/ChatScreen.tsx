@@ -37,6 +37,7 @@ const ChatScreen = () => {
     const [inputText, setInputText] = useState('');
     const [showMore, setShowMore] = useState(false);
     const [isVoiceMode, setIsVoiceMode] = useState(false);
+    const [connStatus, setConnStatus] = useState<'connected' | 'disconnected' | 'connecting'>(signalingManager.getConnectionStatus(peerId) as any);
 
     const userState = useSelector((state: RootState) => (state as any).user);
     const peers = useSelector((state: RootState) => state.chat.peers);
@@ -78,6 +79,7 @@ const ChatScreen = () => {
 
         const handleSignalingError = (err: any) => {
             if (err.type === 'CONNECTION_FAILED' && err.peerId === peerId) {
+                setConnStatus('disconnected');
                 Alert.alert(
                     '连接失败',
                     '无法通过局域网找到该节点。请确保双方：\n1. 连接在同一个 WiFi 下\n2. 手机没有开启“热点”或切换到“数据网络”\n3. 对方应用正在运行',
@@ -86,15 +88,30 @@ const ChatScreen = () => {
             }
         };
 
+        const handleStatusChange = (data: { peerId: string, status: any }) => {
+            if (data.peerId === peerId) {
+                setConnStatus(data.status);
+            }
+        };
+
+        // 初始进入时，如果没有连接，尝试扫描一次
+        if (signalingManager.getConnectionStatus(peerId) === 'disconnected') {
+            if (profile?.id) {
+                signalingManager.start(profile.id, profile.name);
+            }
+        }
+
         p2pService.on('message', handleMsg);
         p2pService.on('refresh', handleRefresh);
         signalingManager.on('error', handleSignalingError);
+        signalingManager.on('statusChange', handleStatusChange);
 
         return () => {
             setActivePeerId(null);
             p2pService.off('message', handleMsg);
             p2pService.off('refresh', handleRefresh);
             signalingManager.off('error', handleSignalingError);
+            signalingManager.off('statusChange', handleStatusChange);
         };
     }, [peerId, dispatch, profile?.id]);
 
@@ -118,7 +135,11 @@ const ChatScreen = () => {
         }
 
         const { isMe, ...payload } = newMessage;
-        await p2pService.sendPayload(peerId, payload);
+        const sent = await p2pService.sendPayload(peerId, payload);
+        if (!sent) {
+            // 如果发送失败，展示一个不可达提示（不阻塞本地显示，但提醒用户）
+            console.log('[Chat] 消息发送可能失败，节点不在线');
+        }
         setInputText('');
     };
 
@@ -266,17 +287,23 @@ const ChatScreen = () => {
 
     useEffect(() => {
         const displayName = peerInfo?.name || peerName || '聊天';
+        const isOnline = connStatus === 'connected';
+
         navigation.setOptions({
             headerTitle: () => (
                 <TouchableOpacity onPress={handleRename} style={{ alignItems: 'center' }}>
-                    <Text style={{ fontSize: 17, fontWeight: '600', color: '#000' }}>{displayName}</Text>
-                    <Text style={{ fontSize: 10, color: '#999' }}>点击修改备注</Text>
+                    <Text style={{ fontSize: 17, fontWeight: '600', color: isOnline ? '#000' : '#888' }}>
+                        {displayName}
+                    </Text>
+                    <Text style={{ fontSize: 10, color: isOnline ? '#07C160' : '#FA5151' }}>
+                        {isOnline ? '● 在线' : '○ 寻找节点中...'}
+                    </Text>
                 </TouchableOpacity>
             ),
             headerStyle: { backgroundColor: '#EDEDED' },
             headerShadowVisible: false
         });
-    }, [navigation, peerInfo?.name, peerName]);
+    }, [navigation, peerInfo?.name, peerName, connStatus]);
 
     return (
         <View style={styles.container}>

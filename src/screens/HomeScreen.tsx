@@ -23,7 +23,7 @@ const HomeScreen = () => {
 
     React.useEffect(() => {
         if (profile?.id) {
-            signalingManager.start(profile.id);
+            signalingManager.start(profile.id, profile.name);
 
             const handlePeerFound = (peer: any) => {
                 dispatch(upsertPeer(peer));

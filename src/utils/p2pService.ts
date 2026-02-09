@@ -2,6 +2,7 @@ import EventEmitter from 'events';
 import { webrtcManager } from './webrtcManager';
 import { clearMessages } from './storage';
 import { XORCrypto } from './crypto';
+import { signalingManager } from './signalingManager';
 
 const CHUNK_SIZE = 16384; // 16KB per chunk to be safe with RTCDataChannel
 
@@ -45,8 +46,15 @@ class P2PService extends EventEmitter {
         const success = webrtcManager.sendMessage(to, finalPayload);
         if (!success) {
             console.log(`[P2P] WebRTC 不可用，降级 TCP 发送`, finalPayload.type);
-            this.emit('signal', { to, ...finalPayload });
+            // 检查信令通道是否存在
+            const sigConn = signalingManager.getConnectionStatus(to) === 'connected';
+            if (sigConn) {
+                this.emit('signal', { to, ...finalPayload });
+                return true;
+            }
+            return false;
         }
+        return true;
     }
 
     /**
@@ -77,9 +85,14 @@ class P2PService extends EventEmitter {
                 timestamp: Date.now(),
                 isEncrypted: !!key
             };
-            await this.sendPayload(to, payload);
+            const success = await this.sendPayload(to, payload);
+            if (!success) {
+                console.error(`[P2P] 文件 ${fileId} 发送分片 ${i} 失败`);
+                return false;
+            }
             if (i % 5 === 0) await new Promise(r => setTimeout(r, 10));
         }
+        return true;
     }
 
     public receivePayload(from: string, data: any) {
