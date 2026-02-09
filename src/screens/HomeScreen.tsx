@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, FlatList } from 'react-native';
+import { View, StyleSheet, FlatList, Alert, TouchableOpacity, Clipboard } from 'react-native';
 import { Text, ListItem, Icon, FAB } from '@rneui/themed';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
@@ -31,11 +31,20 @@ const HomeScreen = ({ navigation }) => {
 
     return (
         <View style={styles.container}>
-            <ListItem bottomDivider>
+            <ListItem
+                bottomDivider
+                onPress={() => {
+                    if (profile?.id) {
+                        Clipboard.setString(profile.id);
+                        Alert.alert('已复制', `完整 ID 已复制到剪贴板`);
+                    }
+                }}
+            >
                 <ListItem.Content>
                     <ListItem.Title style={styles.welcome}>你好, {profile?.name}</ListItem.Title>
-                    <ListItem.Subtitle>ID: {profile?.id?.substring(0, 16)}...</ListItem.Subtitle>
+                    <ListItem.Subtitle>ID: {profile?.id?.substring(0, 16)}... (点击复制)</ListItem.Subtitle>
                 </ListItem.Content>
+                <Icon iconProps={{ name: "copy-outline", size: 20, color: "#999" }} />
             </ListItem>
 
             {discoveredPeers.length > 0 ? (
@@ -47,28 +56,51 @@ const HomeScreen = ({ navigation }) => {
                             bottomDivider
                             onPress={() => navigation.navigate('Chat', { peerId: item.id, peerName: item.name })}
                         >
-                            <Icon iconProps={{ name: "person" }} />
+                            <Icon iconProps={{ name: "person-outline" }} />
                             <ListItem.Content>
                                 <ListItem.Title>{item.name || '未知节点'}</ListItem.Title>
                                 <ListItem.Subtitle>{item.id.substring(0, 20)}...</ListItem.Subtitle>
                             </ListItem.Content>
-                            <ListItem.Chevron />
+                            <Icon iconProps={{ name: "chevron-forward-outline", size: 20, color: "#999" }} />
                         </ListItem>
                     )}
                 />
             ) : (
                 <View style={styles.emptyContainer}>
-                    <Icon iconProps={{ name: "search", size: 60, color: "#ccc" }} />
-                    <Text style={styles.emptyText}>正在发现附近的节点...</Text>
+                    <Icon iconProps={{ name: "search-outline", size: 60, color: "#ccc" }} />
+                    <Text style={styles.emptyText}>暂无发现的节点</Text>
+                    <Text style={styles.emptyHint}>点击右下角 + 按钮,输入对方 ID 开始对话</Text>
                 </View>
             )}
 
             <FAB
-                icon={<Icon iconProps={{ name: 'add', color: 'white' }} />}
+                icon={<Icon iconProps={{ name: 'add-outline', color: 'white' }} />}
                 color="#2089dc"
                 placement="right"
                 title="开始新对话"
-                onPress={() => { }}
+                onPress={() => {
+                    Alert.prompt(
+                        '开始新对话',
+                        '请输入或粘贴对方的完整节点 ID',
+                        [
+                            { text: '取消', style: 'cancel' },
+                            {
+                                text: '开始对话',
+                                onPress: (peerId) => {
+                                    if (peerId && peerId.trim()) {
+                                        navigation.navigate('Chat', {
+                                            peerId: peerId.trim(),
+                                            peerName: '手动连接'
+                                        });
+                                    } else {
+                                        Alert.alert('错误', '请输入有效的节点 ID');
+                                    }
+                                }
+                            }
+                        ],
+                        'plain-text'
+                    );
+                }}
             />
         </View>
     );
@@ -91,6 +123,13 @@ const styles = StyleSheet.create({
     emptyText: {
         marginTop: 10,
         color: '#999',
+    },
+    emptyHint: {
+        marginTop: 5,
+        color: '#bbb',
+        fontSize: 12,
+        textAlign: 'center',
+        paddingHorizontal: 20,
     },
 });
 

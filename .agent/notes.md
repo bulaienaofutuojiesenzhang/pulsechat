@@ -29,6 +29,12 @@
   - Windows 路径分隔符导致 CMake 语法错误
   - 修复: 在 `node_modules/react-native-libsodium/android/CMakeLists.txt` 第 34 行添加 `file(TO_CMAKE_PATH ...)` 转换路径
   - 错误信息: `Syntax error in cmake code when parsing string`
+- **Zeroconf 权限错误** (Android):
+  - 错误: `Neither user nor current process has android.permission.CHANGE_WIFI_MULTICAST_STATE`
+  - 修复: 在 `android/app/src/main/AndroidManifest.xml` 添加权限:
+    - `CHANGE_WIFI_MULTICAST_STATE`
+    - `CHANGE_WIFI_STATE`
+  - 需要重新编译安装应用
 
 ## 3. 项目目标
 - 纯 P2P 加密聊天 (Pchat)。

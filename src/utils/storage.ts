@@ -1,21 +1,34 @@
-import { MMKV } from 'react-native-mmkv';
+import { createMMKV } from 'react-native-mmkv';
 
-const storage = new MMKV();
+const storage = createMMKV();
 
 export const saveMessage = (peerId: string, message: any) => {
-    const key = `messages_${peerId}`;
-    const existingMessagesStr = storage.getString(key);
-    const messages = existingMessagesStr ? JSON.parse(existingMessagesStr) : [];
-    messages.push(message);
-    storage.set(key, JSON.stringify(messages));
+    try {
+        const key = `messages_${peerId}`;
+        const existingMessagesStr = storage.getString(key);
+        const messages = existingMessagesStr ? JSON.parse(existingMessagesStr) : [];
+        messages.push(message);
+        storage.set(key, JSON.stringify(messages));
+    } catch (error) {
+        console.error('[Storage] 保存消息失败:', error);
+    }
 };
 
 export const getMessages = (peerId: string) => {
-    const key = `messages_${peerId}`;
-    const messagesStr = storage.getString(key);
-    return messagesStr ? JSON.parse(messagesStr) : [];
+    try {
+        const key = `messages_${peerId}`;
+        const messagesStr = storage.getString(key);
+        return messagesStr ? JSON.parse(messagesStr) : [];
+    } catch (error) {
+        console.error('[Storage] 读取消息失败:', error);
+        return [];
+    }
 };
 
 export const clearMessages = (peerId: string) => {
-    storage.delete(`messages_${peerId}`);
+    try {
+        storage.remove(`messages_${peerId}`);
+    } catch (error) {
+        console.error('[Storage] 清除消息失败:', error);
+    }
 };
