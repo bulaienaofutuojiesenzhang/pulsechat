@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, StyleSheet, FlatList, Alert, TouchableOpacity, Clipboard } from 'react-native';
-import { Text, ListItem, Icon, FAB } from '@rneui/themed';
+import { View, FlatList, StyleSheet, Alert, TouchableOpacity, Clipboard, Text } from 'react-native';
+import { ListItem, FAB } from '@rneui/themed';
+import { useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { signalingManager } from '../utils/signalingManager';
@@ -44,7 +45,7 @@ const HomeScreen = ({ navigation }) => {
                     <ListItem.Title style={styles.welcome}>你好, {profile?.name}</ListItem.Title>
                     <ListItem.Subtitle>ID: {profile?.id?.substring(0, 16)}... (点击复制)</ListItem.Subtitle>
                 </ListItem.Content>
-                <Icon iconProps={{ name: "copy-outline", size: 20, color: "#999" }} />
+                <Text style={{ fontSize: 20 }}>📋</Text>
             </ListItem>
 
             {discoveredPeers.length > 0 ? (
@@ -56,25 +57,25 @@ const HomeScreen = ({ navigation }) => {
                             bottomDivider
                             onPress={() => navigation.navigate('Chat', { peerId: item.id, peerName: item.name })}
                         >
-                            <Icon iconProps={{ name: "person-outline" }} />
+                            <Text style={{ fontSize: 24 }}>👤</Text>
                             <ListItem.Content>
                                 <ListItem.Title>{item.name || '未知节点'}</ListItem.Title>
                                 <ListItem.Subtitle>{item.id.substring(0, 20)}...</ListItem.Subtitle>
                             </ListItem.Content>
-                            <Icon iconProps={{ name: "chevron-forward-outline", size: 20, color: "#999" }} />
+                            <Text style={{ fontSize: 18, color: '#999' }}>〉</Text>
                         </ListItem>
                     )}
                 />
             ) : (
                 <View style={styles.emptyContainer}>
-                    <Icon iconProps={{ name: "search-outline", size: 60, color: "#ccc" }} />
+                    <Text style={{ fontSize: 60, color: "#ccc" }}>🔍</Text>
                     <Text style={styles.emptyText}>暂无发现的节点</Text>
                     <Text style={styles.emptyHint}>点击右下角 + 按钮,输入对方 ID 开始对话</Text>
                 </View>
             )}
 
             <FAB
-                icon={<Icon iconProps={{ name: 'add-outline', color: 'white' }} />}
+                icon={<Text style={{ fontSize: 24, color: 'white' }}>➕</Text>}
                 color="#2089dc"
                 placement="right"
                 title="开始新对话"

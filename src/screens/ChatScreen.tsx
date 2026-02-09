@@ -73,7 +73,7 @@ const ChatScreen = ({ route }) => {
                     inputContainerStyle={{ borderBottomWidth: 0 }}
                 />
                 <Button
-                    icon={<Icon iconProps={{ name: "send-outline", color: "#fff" }} />}
+                    title="发送"
                     onPress={handleSend}
                     buttonStyle={styles.sendButton}
                 />

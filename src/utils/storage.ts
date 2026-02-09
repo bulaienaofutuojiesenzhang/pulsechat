@@ -1,6 +1,7 @@
-import { createMMKV } from 'react-native-mmkv';
+import { MMKV } from 'react-native-mmkv';
 
-const storage = createMMKV();
+// MMKV v3.x 稳定版写法
+const storage = new MMKV();
 
 export const saveMessage = (peerId: string, message: any) => {
     try {
@@ -27,7 +28,7 @@ export const getMessages = (peerId: string) => {
 
 export const clearMessages = (peerId: string) => {
     try {
-        storage.remove(`messages_${peerId}`);
+        storage.delete(`messages_${peerId}`);
     } catch (error) {
         console.error('[Storage] 清除消息失败:', error);
     }

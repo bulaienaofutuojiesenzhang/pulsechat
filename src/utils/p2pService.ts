@@ -1,95 +1,54 @@
-import { RTCPeerConnection, RTCIceCandidate, RTCSessionDescription } from 'react-native-webrtc';
 import EventEmitter from 'events';
+import { webrtcManager } from './webrtcManager';
+import { clearMessages } from './storage';
 
 class P2PService extends EventEmitter {
-    private peers: Map<string, any> = new Map();
-    private dataChannels: Map<string, any> = new Map();
-
     constructor() {
         super();
-    }
-
-    // Placeholder for DHT node discovery
-    async startDiscovery(myId: string) {
-        console.log('Starting P2P discovery for:', myId);
-    }
-
-    async connectToPeer(peerId: string) {
-        if (this.peers.has(peerId)) return;
-
-        const pc = new RTCPeerConnection({
-            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        // 监听来自 WebRTC 的底层消息
+        webrtcManager.on('message', ({ from, data }) => {
+            this.handleIncomingData(from, data);
         });
-
-        this.peers.set(peerId, pc);
-
-        const dc = (pc as any).createDataChannel('chat');
-        this.setupDataChannel(peerId, dc);
-
-        const offer = await (pc as any).createOffer();
-        await (pc as any).setLocalDescription(offer);
-
-        this.emit('signal', { to: peerId, type: 'offer', sdp: offer });
-
-        (pc as any).onicecandidate = (event: any) => {
-            if (event.candidate) {
-                this.emit('signal', { to: peerId, type: 'candidate', candidate: event.candidate });
-            }
-        };
     }
 
-    async handleSignal(peerId: string, signal: any) {
-        let pc = this.peers.get(peerId);
-        if (!pc) {
-            pc = new RTCPeerConnection({
-                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-            });
-            this.peers.set(peerId, pc);
-
-            (pc as any).ondatachannel = (event: any) => {
-                this.setupDataChannel(peerId, event.channel);
-            };
-
-            (pc as any).onicecandidate = (event: any) => {
-                if (event.candidate) {
-                    this.emit('signal', { to: peerId, type: 'candidate', candidate: event.candidate });
-                }
-            };
-        }
-
-        if (signal.type === 'offer') {
-            await (pc as any).setRemoteDescription(new RTCSessionDescription(signal.sdp));
-            const answer = await (pc as any).createAnswer();
-            await (pc as any).setLocalDescription(answer);
-            this.emit('signal', { to: peerId, type: 'answer', sdp: answer });
-        } else if (signal.type === 'answer') {
-            await (pc as any).setRemoteDescription(new RTCSessionDescription(signal.sdp));
-        } else if (signal.type === 'candidate') {
-            await (pc as any).addIceCandidate(new RTCIceCandidate(signal.candidate));
+    /**
+     * 发送加密消息或指令
+     */
+    async sendPayload(to: string, payload: any) {
+        // 优先使用 WebRTC 互联网通道
+        const success = webrtcManager.sendMessage(to, payload);
+        if (!success) {
+            // 如果 WebRTC 还没通，把信号交给信令层去尝试握手
+            this.emit('signal', { to, ...payload });
         }
     }
 
-    private setupDataChannel(peerId: string, dc: any) {
-        this.dataChannels.set(peerId, dc);
-        dc.onopen = () => {
-            console.log('Data channel open with:', peerId);
-            this.emit('connectionChange', { peerId, status: 'connected' });
-        };
-        dc.onclose = () => {
-            this.emit('connectionChange', { peerId, status: 'disconnected' });
-        };
-        dc.onmessage = (event: any) => {
-            this.emit('message', { from: peerId, text: event.data });
-        };
+    /**
+     * 处理具体业务逻辑
+     */
+    private handleIncomingData(from: string, data: any) {
+        if (data.type === 'chat') {
+            this.emit('message', { from, text: data.text, timestamp: data.timestamp });
+        } else if (data.type === 'delete_all') {
+            // 实现同步删除：收到对方的删除指令，清空本地存储
+            console.log(`[P2P] 收到来自 ${from} 的同步删除请求`);
+            clearMessages(from);
+            this.emit('refresh'); // 通知 UI 刷新
+        }
     }
 
-    async sendMessage(peerId: string, message: string) {
-        const dc = this.dataChannels.get(peerId);
-        if (dc && dc.readyState === 'open') {
-            dc.send(message);
-            return true;
-        }
-        return false;
+    /**
+     * 发起同步删除
+     */
+    async requestSyncDelete(peerId: string) {
+        await this.sendPayload(peerId, { type: 'delete_all' });
+        clearMessages(peerId); // 本地也要删
+        this.emit('refresh');
+    }
+
+    // 辅助信令转发
+    handleSignal(from: string, signal: any) {
+        webrtcManager.handleSignal(from, signal);
     }
 }
 

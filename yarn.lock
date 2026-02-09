@@ -6087,15 +6087,10 @@ react-native-libsodium@^1.6.0:
     libsodium-wrappers "^0.8.2"
     libsodium-wrappers-sumo "^0.8.2"
 
-react-native-mmkv@^4.1.2:
-  version "4.1.2"
-  resolved "https://registry.npmmirror.com/react-native-mmkv/-/react-native-mmkv-4.1.2.tgz"
-  integrity sha512-6LHb2DQBXuo96Aues13EugmlWw/HAYuh3KoJoQNrC4JsBwn3J3KiRYAg2mCm5Je0VYq2YsmbgZG7XJwX/WFYZA==
-
-react-native-nitro-modules@^0.33.7:
-  version "0.33.7"
-  resolved "https://registry.npmmirror.com/react-native-nitro-modules/-/react-native-nitro-modules-0.33.7.tgz"
-  integrity sha512-WepMobWe4j1Ae5GQ5RxYGBdBpJBwzP6zaOxJ7r6nhbY5iyl01DL3Gsh4gk8edzNFRuAh1rvXDAHIipq8SahxeQ==
+react-native-mmkv@3.3.3:
+  version "3.3.3"
+  resolved "https://registry.npmmirror.com/react-native-mmkv/-/react-native-mmkv-3.3.3.tgz#1f0326f6314e23725af8145964343224d074e6cd"
+  integrity sha512-GMsfOmNzx0p5+CtrCFRVtpOOMYNJXuksBVARSQrCFaZwjUyHJdQzcN900GGaFFNTxw2fs8s5Xje//RDKj9+PZA==
 
 react-native-safe-area-context@^5.6.2:
   version "5.6.2"
