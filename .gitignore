@@ -96,3 +96,4 @@ yarn-error.log
 # 项目初始化模板 (个人使用，不提交)
 PROJECT.md
 *.gradle
+package-lock.json

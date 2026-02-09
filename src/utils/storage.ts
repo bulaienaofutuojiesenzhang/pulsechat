@@ -7,7 +7,13 @@ export const saveMessage = (peerId: string, message: any) => {
     try {
         const key = `messages_${peerId}`;
         const existingMessagesStr = storage.getString(key);
-        const messages = existingMessagesStr ? JSON.parse(existingMessagesStr) : [];
+        let messages = existingMessagesStr ? JSON.parse(existingMessagesStr) : [];
+
+        // 去重逻辑：如果已存在相同 ID 的消息，则不重复保存
+        if (messages.find((m: any) => m.id === message.id)) {
+            return;
+        }
+
         messages.push(message);
         storage.set(key, JSON.stringify(messages));
     } catch (error) {

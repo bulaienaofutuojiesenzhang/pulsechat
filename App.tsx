@@ -6,6 +6,7 @@ import { PersistGate } from 'redux-persist/integration/react';
 import { store, persistor } from './src/store';
 import RootNavigator from './src/navigation';
 import { ThemeProvider, createTheme } from '@rneui/themed';
+import GlobalMessageListener from './src/utils/GlobalMessageListener';
 
 const theme = createTheme({
   lightColors: {
@@ -23,6 +24,7 @@ function App(): React.JSX.Element {
       <PersistGate loading={null} persistor={persistor}>
         <SafeAreaProvider>
           <ThemeProvider theme={theme}>
+            <GlobalMessageListener />
             <RootNavigator />
           </ThemeProvider>
         </SafeAreaProvider>

@@ -110,6 +110,41 @@ class WebRTCManager extends EventEmitter {
             console.error('[WebRTC] 创建 Offer 失败:', e);
         }
     }
+
+    /**
+     * 生成手动连接码 (包含 Offer 和所有已收集到的 Candidates)
+     */
+    async generateConnectionCode(peerId: string): Promise<string> {
+        const pc = await this.createPeerConnection(peerId);
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        // 等待 ICE 收集一点数据 (或者是让用户稍等片刻)
+        await new Promise(r => setTimeout(r, 1000));
+
+        const codeObj = {
+            from: 'manual',
+            type: pc.localDescription.type,
+            sdp: pc.localDescription.sdp,
+        };
+        return btoa(JSON.stringify(codeObj));
+    }
+
+    /**
+     * 应用手动连接码
+     */
+    async applyConnectionCode(peerId: string, code: string) {
+        try {
+            const signal = JSON.parse(atob(code));
+            await this.handleSignal(peerId, {
+                type: signal.type,
+                [signal.type]: signal
+            });
+        } catch (e) {
+            console.error('[WebRTC] 手动应用信令失败:', e);
+            throw new Error('无效的连接码');
+        }
+    }
 }
 
 export const webrtcManager = new WebRTCManager();
