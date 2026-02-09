@@ -2,17 +2,13 @@ import {
     RTCPeerConnection,
     RTCIceCandidate,
     RTCSessionDescription,
-    MediaStream,
-    registerGlobals
 } from 'react-native-webrtc';
 import EventEmitter from 'events';
 
-// 免费的 STUN 服务器，用于 NAT 穿透
 const ICE_SERVERS = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' },
     ]
 };
 
@@ -20,17 +16,13 @@ class WebRTCManager extends EventEmitter {
     private peers: Map<string, RTCPeerConnection> = new Map();
     private dataChannels: Map<string, any> = new Map();
 
-    /**
-     * 创建或获取与某个节点的 P2P 连接
-     */
     async createPeerConnection(peerId: string) {
-        if (this.peers.has(peerId)) return this.peers.get(peerId);
+        if (this.peers.has(peerId)) return this.peers.get(peerId)!;
 
-        const pc = new RTCPeerConnection(ICE_SERVERS);
+        const pc = new RTCPeerConnection(ICE_SERVERS) as any;
 
-        pc.onicecandidate = (event) => {
+        pc.onicecandidate = (event: any) => {
             if (event.candidate) {
-                // 将 ICE Candidate 发送给对方（通过信令通道）
                 this.emit('signal', {
                     to: peerId,
                     type: 'candidate',
@@ -42,7 +34,7 @@ class WebRTCManager extends EventEmitter {
         const dc = pc.createDataChannel('chat');
         this.setupDataChannel(peerId, dc);
 
-        pc.ondatachannel = (event) => {
+        pc.ondatachannel = (event: any) => {
             this.setupDataChannel(peerId, event.channel);
         };
 
@@ -70,9 +62,6 @@ class WebRTCManager extends EventEmitter {
         this.dataChannels.set(peerId, dc);
     }
 
-    /**
-     * 发送消息（支持互联网穿透）
-     */
     sendMessage(peerId: string, data: any) {
         const dc = this.dataChannels.get(peerId);
         if (dc && dc.readyState === 'open') {
@@ -82,33 +71,44 @@ class WebRTCManager extends EventEmitter {
         return false;
     }
 
-    /**
-     * 处理收到的 WebRTC 信令
-     */
     async handleSignal(from: string, signal: any) {
         let pc = this.peers.get(from);
         if (!pc) pc = await this.createPeerConnection(from);
 
-        if (signal.type === 'offer') {
-            await pc.setRemoteDescription(new RTCSessionDescription(signal.offer));
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-            this.emit('signal', { to: from, type: 'answer', answer });
-        } else if (signal.type === 'answer') {
-            await pc.setRemoteDescription(new RTCSessionDescription(signal.answer));
-        } else if (signal.type === 'candidate') {
-            await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+        try {
+            if (signal.type === 'offer') {
+                await pc.setRemoteDescription(new RTCSessionDescription(signal.offer));
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                this.emit('signal', { to: from, type: 'answer', answer });
+            } else if (signal.type === 'answer') {
+                if (pc.signalingState === 'have-local-offer') {
+                    await pc.setRemoteDescription(new RTCSessionDescription(signal.answer));
+                } else {
+                    console.log('[WebRTC] 忽略 Answer: 状态不是 have-local-offer');
+                }
+            } else if (signal.type === 'candidate') {
+                if (pc.remoteDescription) {
+                    await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+                } else {
+                    // 如果还未设置 remoteDescription, 暂存 candidate 或者是让它重试
+                    console.log('[WebRTC] 暂存 Candidate');
+                }
+            }
+        } catch (e) {
+            console.error('[WebRTC] 处理信令失败:', e);
         }
     }
 
-    /**
-     * 发起连接邀请
-     */
     async makeOffer(peerId: string) {
         const pc = await this.createPeerConnection(peerId);
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        this.emit('signal', { to: peerId, type: 'offer', offer });
+        try {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            this.emit('signal', { to: peerId, type: 'offer', offer });
+        } catch (e) {
+            console.error('[WebRTC] 创建 Offer 失败:', e);
+        }
     }
 }
 

@@ -7,7 +7,7 @@ class P2PService extends EventEmitter {
         super();
         // 监听来自 WebRTC 的底层消息
         webrtcManager.on('message', ({ from, data }) => {
-            this.handleIncomingData(from, data);
+            this.receivePayload(from, data);
         });
     }
 
@@ -18,17 +18,21 @@ class P2PService extends EventEmitter {
         // 优先使用 WebRTC 互联网通道
         const success = webrtcManager.sendMessage(to, payload);
         if (!success) {
+            console.log(`[P2P] WebRTC 通道不可用，降级到 TCP 信令发送给 ${to}`, payload.type);
             // 如果 WebRTC 还没通，把信号交给信令层去尝试握手
             this.emit('signal', { to, ...payload });
+        } else {
+            console.log(`[P2P] 通过 WebRTC 成功发送给 ${to}:`, payload.type);
         }
     }
 
     /**
-     * 处理具体业务逻辑
+     * 处理收到的数据（无论是来自 WebRTC 还是 TCP）
      */
-    private handleIncomingData(from: string, data: any) {
+    public receivePayload(from: string, data: any) {
+        console.log(`[P2P] 收到来自 ${from} 的数据:`, data.type);
         if (data.type === 'chat') {
-            this.emit('message', { from, text: data.text, timestamp: data.timestamp });
+            this.emit('message', { from, ...data });
         } else if (data.type === 'delete_all') {
             // 实现同步删除：收到对方的删除指令，清空本地存储
             console.log(`[P2P] 收到来自 ${from} 的同步删除请求`);

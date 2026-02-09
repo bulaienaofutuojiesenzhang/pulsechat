@@ -12,6 +12,7 @@ class SignalingManager extends EventEmitter {
     private port: number = 45678;
     private readonly BASE_PORT = 45678;
     private readonly MAX_PORT_RETRIES = 5;
+    private discoveredPeerIds: Set<string> = new Set();
 
     constructor() {
         super();
@@ -42,12 +43,19 @@ class SignalingManager extends EventEmitter {
     private handleDiscoveredPeer(service: any) {
         if (service.name && service.name.startsWith('pulsechat_') && service.name !== `pulsechat_${this.myId}`) {
             const peerId = service.name.replace('pulsechat_', '');
-            const host = (service.addresses && service.addresses[0]) || service.host;
-            const port = service.port;
 
-            if (host && port) {
-                console.log('[Zeroconf] 尝试建立信令连接:', peerId, host, port);
-                this.connectToPeerSignaling(peerId, host, port);
+            // 仲裁机制：只有 ID 较小的节点负责发起主动连接
+            // 这保证了局域网内两端之间只有一条 TCP 连接，不会冲突
+            if (this.myId < peerId) {
+                const host = (service.addresses && service.addresses[0]) || service.host;
+                const port = service.port;
+
+                if (host && port) {
+                    console.log('[Zeroconf] 我是发起方，尝试建立信令连接:', peerId, host, port);
+                    this.connectToPeerSignaling(peerId, host, port);
+                }
+            } else {
+                console.log('[Zeroconf] 我是接收方，等待对方连接:', peerId);
             }
         }
     }
@@ -82,10 +90,15 @@ class SignalingManager extends EventEmitter {
                                 const msg = JSON.parse(part);
                                 if (msg.type === 'identify') {
                                     this.clients.set(msg.id, socket);
-                                    this.emit('peerFound', { id: msg.id, name: msg.name || 'Peer' });
-                                    webrtcManager.makeOffer(msg.id);
+                                    if (!this.discoveredPeerIds.has(msg.id)) {
+                                        this.discoveredPeerIds.add(msg.id);
+                                        this.emit('peerFound', { id: msg.id, name: msg.name || 'Peer' });
+                                    }
+                                    // 服务器端在收到身份后，不主动发 offer，等待对方发
+                                } else if (['offer', 'answer', 'candidate'].includes(msg.type)) {
+                                    webrtcManager.handleSignal(msg.from, msg);
                                 } else {
-                                    p2pService.handleSignal(msg.from, msg);
+                                    p2pService.receivePayload(msg.from, msg);
                                 }
                             } catch (e) {
                                 console.error('[SignalingManager] 分段解析错误:', e, part);
@@ -120,18 +133,40 @@ class SignalingManager extends EventEmitter {
         const client = TcpSocket.createConnection({ port, host }, () => {
             client.write(JSON.stringify({ type: 'identify', id: this.myId, name: 'Peer' }));
             this.clients.set(peerId, client);
-            this.emit('peerFound', { id: peerId, name: 'Peer' });
+            if (!this.discoveredPeerIds.has(peerId)) {
+                this.discoveredPeerIds.add(peerId);
+                this.emit('peerFound', { id: peerId, name: 'Peer' });
+            }
             // 被动等待对方发起 Offer 或我主动发起
             webrtcManager.makeOffer(peerId);
         });
 
+        let buffer = '';
         client.on('data', (data) => {
-            try {
-                const msg = JSON.parse(data.toString());
-                webrtcManager.handleSignal(msg.from, msg);
-            } catch (e) {
-                console.error('[SignalingManager] 客户端解析错误:', e);
-            }
+            buffer += data.toString();
+            let boundary = buffer.lastIndexOf('}');
+            if (boundary === -1) return;
+            const content = buffer.substring(0, boundary + 1);
+            buffer = buffer.substring(boundary + 1);
+            const parts = content.split('}{').map((p, i, a) => {
+                if (a.length === 1) return p;
+                if (i === 0) return p + '}';
+                if (i === a.length - 1) return '{' + p;
+                return '{' + p + '}';
+            });
+
+            parts.forEach(part => {
+                try {
+                    const msg = JSON.parse(part);
+                    if (['offer', 'answer', 'candidate'].includes(msg.type)) {
+                        webrtcManager.handleSignal(msg.from, msg);
+                    } else {
+                        p2pService.receivePayload(msg.from, msg);
+                    }
+                } catch (e) {
+                    console.error('[SignalingManager] 客户端分段解析错误:', e);
+                }
+            });
         });
 
         client.on('error', (err) => {
@@ -142,12 +177,16 @@ class SignalingManager extends EventEmitter {
     private sendSignal(peerId: string, signal: any) {
         const client = this.clients.get(peerId);
         if (client) {
+            console.log(`[SignalingManager] 通过 TCP 发送数据给 ${peerId}:`, signal.type);
             client.write(JSON.stringify({ ...signal, from: this.myId }));
+        } else {
+            console.log(`[SignalingManager] 发送失败: 找不到节点 ${peerId} 的 TCP 连接`);
         }
     }
 
     async start(myId: string) {
         this.myId = myId;
+        this.discoveredPeerIds.clear();
         try {
             await this.startServer();
             try {
@@ -172,6 +211,7 @@ class SignalingManager extends EventEmitter {
             try { client.destroy(); } catch (e) { }
         });
         this.clients.clear();
+        this.discoveredPeerIds.clear();
     }
 }
 
