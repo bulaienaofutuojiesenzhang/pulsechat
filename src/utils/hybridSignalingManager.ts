@@ -98,7 +98,11 @@ class HybridSignalingManager extends EventEmitter {
             return 'connected';
         }
 
-        // TODO: 可以增加互联网模式的状态检查
+        // 检查互联网模式的状态
+        if (internetSignalingManager.isUserOnline(peerId)) {
+            return 'connected';
+        }
+
         return 'disconnected';
     }
 
@@ -151,8 +155,12 @@ class HybridSignalingManager extends EventEmitter {
         });
 
         internetSignalingManager.on('signal', (signal) => {
-            // 转发给 WebRTC 管理器处理
-            webrtcManager.handleSignal(signal.from, signal);
+            // 根据信号类型判断是 WebRTC 握手还是 P2P 降级数据
+            if (['offer', 'answer', 'candidate'].includes(signal.type)) {
+                webrtcManager.handleSignal(signal.from, signal);
+            } else {
+                p2pService.receivePayload(signal.from, signal);
+            }
         });
 
         internetSignalingManager.on('connected', () => {

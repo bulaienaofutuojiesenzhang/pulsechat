@@ -29,10 +29,13 @@ const chatSlice = createSlice({
     name: 'chat',
     initialState,
     reducers: {
-        upsertPeer: (state, action: PayloadAction<{ id: string; name: string }>) => {
+        upsertPeer: (state, action: PayloadAction<{ id: string; name?: string }>) => {
             const { id, name } = action.payload;
+            const defaultName = `Node-${id.substring(id.length - 8)}`;
+            const finalName = name || defaultName;
+
             if (!state.peers[id]) {
-                state.peers[id] = { id, name, unreadCount: 0 };
+                state.peers[id] = { id, name: finalName, unreadCount: 0 };
             } else {
                 // 如果已存在节点，且传入了非 Node- 开头的有效名称，则更新
                 const oldName = state.peers[id].name;

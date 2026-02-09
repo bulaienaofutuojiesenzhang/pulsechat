@@ -66,9 +66,9 @@ const ChatScreen = () => {
         const handleMsg = (msg: any) => {
             if (msg.from === currentPeerId.current) {
                 setMessages(prev => {
-                    const exists = prev.some(m => m.id === msg.data.id);
+                    const exists = prev.some(m => m.id === msg.id);
                     if (exists) return prev;
-                    return [...prev, msg.data];
+                    return [...prev, msg];
                 });
             }
         };

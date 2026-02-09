@@ -11,6 +11,7 @@ class InternetSignalingManager extends EventEmitter {
     private myUserId: string = '';
     private isConnected: boolean = false;
     private reconnectTimer: any = null;
+    private onlineUserIds: Set<string> = new Set();
 
     constructor() {
         super();
@@ -119,6 +120,13 @@ class InternetSignalingManager extends EventEmitter {
     }
 
     /**
+     * 检查用户是否在线
+     */
+    isUserOnline(userId: string): boolean {
+        return this.onlineUserIds.has(userId);
+    }
+
+    /**
      * 设置事件监听器
      */
     private setupEventListeners(): void {
@@ -149,18 +157,22 @@ class InternetSignalingManager extends EventEmitter {
         // 用户上线通知
         this.socket.on('user-online', (data: { userId: string }) => {
             console.log(`[InternetSignaling] 用户上线: ${data.userId}`);
+            this.onlineUserIds.add(data.userId);
             this.emit('peer-online', { id: data.userId });
         });
 
         // 用户下线通知
         this.socket.on('user-offline', (data: { userId: string }) => {
             console.log(`[InternetSignaling] 用户下线: ${data.userId}`);
+            this.onlineUserIds.delete(data.userId);
             this.emit('peer-offline', { id: data.userId });
         });
 
         // 在线用户列表
         this.socket.on('online-users', (data: { users: string[] }) => {
             console.log('[InternetSignaling] 在线用户列表:', data.users);
+            this.onlineUserIds.clear();
+            data.users.forEach(id => this.onlineUserIds.add(id));
             this.emit('online-users', data.users);
         });
 

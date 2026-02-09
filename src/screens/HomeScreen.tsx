@@ -156,7 +156,7 @@ const HomeScreen = () => {
 
             {peerList.length > 0 ? (
                 <FlatList
-                    data={peerList.filter(p => p.name.includes(search))}
+                    data={peerList.filter(p => (p.name || '').includes(search))}
                     keyExtractor={item => item.id}
                     renderItem={renderItem}
                 />

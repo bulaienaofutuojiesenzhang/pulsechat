@@ -33,15 +33,6 @@ class SignalingManager extends EventEmitter {
             console.log('[Zeroconf] 运行阶段错误(忽略):', err);
             // 不要在此时 scan()，否则会造成无限循环
         });
-
-        p2pService.on('signal', (data) => {
-            this.sendSignal(data.to, data);
-        });
-
-        // 监听 WebRTC 信号并发送
-        webrtcManager.on('signal', (data) => {
-            this.sendSignal(data.to, data);
-        });
     }
 
     private handleDiscoveredPeer(service: any) {

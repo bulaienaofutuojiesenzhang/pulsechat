@@ -2,7 +2,7 @@ import EventEmitter from 'events';
 import { webrtcManager } from './webrtcManager';
 import { clearMessages } from './storage';
 import { XORCrypto } from './crypto';
-import { signalingManager } from './signalingManager';
+import { hybridSignalingManager } from './hybridSignalingManager';
 
 const CHUNK_SIZE = 16384; // 16KB per chunk to be safe with RTCDataChannel
 
@@ -46,8 +46,8 @@ class P2PService extends EventEmitter {
         const success = webrtcManager.sendMessage(to, finalPayload);
         if (!success) {
             console.log(`[P2P] WebRTC 不可用，降级 TCP 发送`, finalPayload.type);
-            // 检查信令通道是否存在
-            const sigConn = signalingManager.getConnectionStatus(to) === 'connected';
+            // 检查信令通道是否存在 (包括局域网和互联网)
+            const sigConn = hybridSignalingManager.getConnectionStatus(to) === 'connected';
             if (sigConn) {
                 this.emit('signal', { to, ...finalPayload });
                 return true;
