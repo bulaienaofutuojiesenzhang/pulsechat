@@ -317,16 +317,23 @@ const ChatScreen = () => {
     }, [navigation, peerInfo?.name, peerName, connStatus]);
 
     const flatListRef = useRef<FlatList>(null);
+    const isInitialLoad = useRef(true);
 
-    const scrollToBottom = () => {
+    const scrollToBottom = (animated = true) => {
         setTimeout(() => {
-            flatListRef.current?.scrollToEnd({ animated: true });
-        }, 100);
+            flatListRef.current?.scrollToEnd({ animated });
+        }, isInitialLoad.current ? 0 : 100);
     };
 
     useEffect(() => {
         if (messages.length > 0) {
-            scrollToBottom();
+            if (isInitialLoad.current) {
+                scrollToBottom(false);
+                // 延迟一丁点标记初始化完成，确保内容渲染好
+                setTimeout(() => { isInitialLoad.current = false; }, 500);
+            } else {
+                scrollToBottom(true);
+            }
         }
     }, [messages.length]);
 

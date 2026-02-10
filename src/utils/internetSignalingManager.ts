@@ -15,6 +15,8 @@ class InternetSignalingManager extends EventEmitter {
 
     constructor() {
         super();
+        // 重要：添加一个空监听器，防止 EventEmitter 在没有外部监听时因为 'error' 事件导致进程崩溃/红色报错
+        this.on('error', () => { });
     }
 
     /**
@@ -58,10 +60,25 @@ class InternetSignalingManager extends EventEmitter {
             // 注册用户
             this.socket.emit('register', { userId: this.myUserId });
 
+            // 启动定时自检和状态刷新 (每 30 秒一次)
+            this.startHealthCheck();
+
         } catch (error) {
-            console.error('[InternetSignaling] 启动失败:', error);
+            // 互联网是备份通道，连接失败不需要在控制台抛出巨大错误或中断程序
+            console.log('[InternetSignaling] 互联网服务暂不可用 (可能无网络或服务器维护)');
             this.emit('error', { type: 'CONNECTION_FAILED', error });
-            throw error;
+            // 不再向上 throw，避免在异步链中造成 Unhandled Promise Rejection
+        }
+    }
+
+    /**
+     * 强行重置连接 (通常在网络环境剧烈变化后使用)
+     */
+    async refresh(): Promise<void> {
+        console.log('[InternetSignaling] 正在强制刷新互联网信令连接...');
+        this.stop();
+        if (this.myUserId) {
+            await this.start(this.myUserId);
         }
     }
 
@@ -81,7 +98,33 @@ class InternetSignalingManager extends EventEmitter {
         }
 
         this.isConnected = false;
+        this.stopHealthCheck();
         console.log('[InternetSignaling] 已停止');
+    }
+
+    private healthCheckTimer: any = null;
+    private startHealthCheck() {
+        this.stopHealthCheck();
+        this.healthCheckTimer = setInterval(() => {
+            if (this.socket?.connected) {
+                // 每 10 秒主动告诉一次服务器：我还在线，请刷新我的映射
+                if (this.myUserId) {
+                    this.socket.emit('register', { userId: this.myUserId });
+                }
+                // 请求在线用户作为心跳探测
+                this.socket.emit('get-online-users');
+            } else if (this.myUserId) {
+                console.log('[InternetSignaling] 检测到连接断开，尝试自动恢复...');
+                this.start(this.myUserId).catch(() => { });
+            }
+        }, 10000); // 缩短到 10 秒
+    }
+
+    private stopHealthCheck() {
+        if (this.healthCheckTimer) {
+            clearInterval(this.healthCheckTimer);
+            this.healthCheckTimer = null;
+        }
     }
 
     /**
@@ -190,7 +233,8 @@ class InternetSignalingManager extends EventEmitter {
 
         // 连接错误
         this.socket.on('connect_error', (error) => {
-            console.error('[InternetSignaling] 连接错误:', error);
+            // 降低日志级别，不要用 console.error 吓到用户和系统
+            console.log('[InternetSignaling] 连接尝试中...');
             this.emit('error', { type: 'CONNECTION_ERROR', error });
         });
 

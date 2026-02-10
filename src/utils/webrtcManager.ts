@@ -14,8 +14,23 @@ class WebRTCManager extends EventEmitter {
     private peers: Map<string, RTCPeerConnection> = new Map();
     private dataChannels: Map<string, any> = new Map();
 
+    constructor() {
+        super();
+        this.on('error', () => { });
+    }
+
     async createPeerConnection(peerId: string) {
-        if (this.peers.has(peerId)) return this.peers.get(peerId)!;
+        const existingPc = this.peers.get(peerId);
+        // 如果连接已存在且不是关闭状态，直接复用
+        if (existingPc && existingPc.connectionState !== 'closed') {
+            return existingPc;
+        }
+
+        // 如果是已关闭的连接，清理旧记录
+        if (existingPc) {
+            this.peers.delete(peerId);
+            this.dataChannels.delete(peerId);
+        }
 
         const pc = new RTCPeerConnection(ICE_SERVERS) as any;
 
@@ -40,6 +55,12 @@ class WebRTCManager extends EventEmitter {
             console.log(`[WebRTC] 与 ${peerId} 连接状态:`, pc.connectionState);
             if (pc.connectionState === 'connected') {
                 this.emit('peerConnected', peerId);
+            } else if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+                // 连接失败或关闭时，从映射中删除，以便下次能创建新连接
+                if (this.peers.get(peerId) === pc) {
+                    this.peers.delete(peerId);
+                    this.dataChannels.delete(peerId);
+                }
             }
         };
 
@@ -116,13 +137,21 @@ class WebRTCManager extends EventEmitter {
     }
 
     async makeOffer(peerId: string) {
-        const pc = await this.createPeerConnection(peerId);
         try {
+            const pc = await this.createPeerConnection(peerId);
+            // 如果 pc 状态已经是 closed，说明在创建过程中被意外关闭，直接跳过
+            if (pc.connectionState === 'closed') return;
+
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
             this.emit('signal', { to: peerId, type: 'offer', offer });
-        } catch (e) {
-            console.error('[WebRTC] 创建 Offer 失败:', e);
+        } catch (e: any) {
+            // 如果是状态不匹配的错误，通常是因为网络切换导致的连接重置，记录日志但不视为严重错误
+            if (e.message?.includes('wrong state')) {
+                console.log('[WebRTC] 创建 Offer 被打断 (状态不匹配)，可能正在进行连接重置');
+            } else {
+                console.error('[WebRTC] 创建 Offer 失败:', e);
+            }
         }
     }
 
@@ -159,6 +188,15 @@ class WebRTCManager extends EventEmitter {
             console.error('[WebRTC] 手动应用信令失败:', e);
             throw new Error('无效的连接码');
         }
+    }
+
+    resetAll() {
+        console.log('[WebRTC] 正在重置所有 PeerConnection...');
+        this.peers.forEach(pc => {
+            try { pc.close(); } catch (e) { }
+        });
+        this.peers.clear();
+        this.dataChannels.clear();
     }
 }
 

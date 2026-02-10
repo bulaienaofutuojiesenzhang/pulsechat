@@ -33,6 +33,9 @@ class SignalingManager extends EventEmitter {
             console.log('[Zeroconf] 运行阶段错误(忽略):', err);
             // 不要在此时 scan()，否则会造成无限循环
         });
+
+        // 防止未监听 error 事件导致的 crash
+        this.on('error', () => { });
     }
 
     private handleDiscoveredPeer(service: any) {
@@ -44,24 +47,56 @@ class SignalingManager extends EventEmitter {
 
             if (peerId === this.myId) return;
 
+            // 提取地址：优先使用 IPv4 地址
+            const host = (service.addresses && service.addresses.find((a: string) => a.includes('.') && !a.startsWith('127.')))
+                || (service.addresses && service.addresses[0])
+                || service.host;
+            const port = service.port;
+
+            if (!host || !port) return;
+
             // 仲裁机制：只有 ID 较小的节点负责发起主动连接
             if (this.myId < peerId) {
-                const host = (service.addresses && service.addresses[0]) || service.host;
-                const port = service.port;
-
-                if (host && port) {
-                    // 如果已经连接过这个 ID，且目前处于断连状态或地址不同，则尝试强制重连
-                    const currentClient = this.clients.get(peerId);
-                    if (currentClient) {
-                        console.log(`[SignalingManager] 节点 ${peerId} 已存在活跃连接，跳过主动握手`);
-                    } else {
-                        console.log('[Zeroconf] 我是发起方，尝试建立信令连接:', peerId, host, port);
-                        this.connectToPeerSignaling(peerId, host, port);
-                    }
+                // 如果已经有连接且状态不是 disconnected，则跳过
+                const currentStatus = this.clientStatus.get(peerId);
+                if (currentStatus === 'connected' || currentStatus === 'connecting') {
+                    console.log(`[SignalingManager] 节点 ${peerId} 已有连接状态 ${currentStatus}，跳过主动握手`);
+                    return;
                 }
+
+                console.log('[Zeroconf] 我是发起方，尝试建立信令连接:', peerId, host, port);
+                this.connectToPeerSignaling(peerId, host, port);
             } else {
-                console.log('[Zeroconf] 我是接收方，等待对方连接:', peerId);
+                console.log('[Zeroconf] 我是接收方，记录发现的节点信息并等待:', peerId, host);
+                // 虽然是接收方，但也记录下状态，方便 UI 显示“连接中”
+                if (!this.clientStatus.has(peerId)) {
+                    this.clientStatus.set(peerId, 'connecting');
+                    this.emit('statusChange', { peerId, status: 'connecting' });
+                }
             }
+
+            // 无论身份，只要发现就通知 UI (用于更新列表)
+            const defaultName = `Node-${peerId.substring(peerId.length - 8)}`;
+            // 绝不直接使用 service.name (pulsechat_XXXX)，因为它不是易读的用户名
+            this.emit('peerFound', { id: peerId, name: defaultName });
+            if (!this.discoveredPeerIds.has(peerId)) {
+                this.discoveredPeerIds.add(peerId);
+            }
+        }
+    }
+
+    /**
+     * 手动触发重新扫描
+     */
+    public scanPeers() {
+        console.log('[SignalingManager] 主动触发局域网扫描...');
+        try {
+            this.zeroconf.stop();
+            setTimeout(() => {
+                this.zeroconf.scan('http', 'tcp', 'local.');
+            }, 500);
+        } catch (e) {
+            console.error('[SignalingManager] 扫描触发失败:', e);
         }
     }
 

@@ -37,9 +37,11 @@ const chatSlice = createSlice({
             if (!state.peers[id]) {
                 state.peers[id] = { id, name: finalName, unreadCount: 0 };
             } else {
-                // 如果已存在节点，且传入了非 Node- 开头的有效名称，则更新
+                // 如果已存在节点，且传入了有效的名称，则更新
+                // 排除掉所有技术性默认名称 (Node-, User-, pulsechat_)
                 const oldName = state.peers[id].name;
-                if (name && name !== oldName && !name.startsWith('Node-')) {
+                const isTechnicalName = name.startsWith('Node-') || name.startsWith('User-') || name.startsWith('pulsechat_');
+                if (name && name !== oldName && !isTechnicalName) {
                     state.peers[id].name = name;
                 }
             }
