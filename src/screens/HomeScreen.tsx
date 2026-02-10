@@ -80,7 +80,7 @@ const HomeScreen = () => {
             containerStyle={styles.listItem}
         >
             <View style={styles.avatarContainer}>
-                <Text style={styles.avatarText}>👤</Text>
+                <Ionicons name="person" size={28} color="#fff" />
                 {item.unreadCount > 0 && (
                     <Badge
                         status="error"
@@ -170,7 +170,7 @@ const HomeScreen = () => {
 
             <FAB
                 icon={<Ionicons name="add" size={24} color="#fff" />}
-                color="#07C160"
+                color="#C19769"
                 placement="right"
                 onPress={() => {
                     Alert.prompt(
@@ -218,8 +218,8 @@ const styles = StyleSheet.create({
     searchBar: { backgroundColor: '#fff', paddingHorizontal: 10, borderBottomWidth: 0.5, borderBottomColor: '#eee' },
     searchInput: { backgroundColor: '#f5f5f5', borderRadius: 8, height: 36 },
     listItem: { height: 72, paddingVertical: 10 },
-    avatarContainer: { width: 48, height: 48, backgroundColor: '#E5E5E5', borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
-    avatarText: { fontSize: 24 },
+    avatarContainer: { width: 48, height: 48, backgroundColor: '#C19769', borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
+    avatarText: { fontSize: 24, color: '#fff' },
     badgeContainer: { position: 'absolute', top: -4, right: -4 },
     listHeader: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginBottom: 4 },
     peerName: { fontSize: 16, fontWeight: '500', color: '#000' },

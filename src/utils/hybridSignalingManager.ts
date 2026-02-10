@@ -128,6 +128,14 @@ class HybridSignalingManager extends EventEmitter {
 
         signalingManager.on('statusChange', (data) => {
             this.emit('statusChange', data);
+
+            // 如果局域网断开,主动检查互联网状态并尝试刷新
+            if (data.status === 'disconnected') {
+                console.log(`[HybridSignaling] 局域网节点 ${data.peerId} 已断开，尝试通过互联网维持连接`);
+                if (internetSignalingManager.isReady()) {
+                    internetSignalingManager.getOnlineUsers();
+                }
+            }
         });
 
         signalingManager.on('error', (error) => {
@@ -137,6 +145,7 @@ class HybridSignalingManager extends EventEmitter {
         // 转发互联网事件
         internetSignalingManager.on('peer-online', (peer) => {
             this.emit('peerFound', { ...peer, mode: COMMUNICATION_MODE.INTERNET });
+            this.emit('statusChange', { peerId: peer.id, status: 'connected' });
         });
 
         internetSignalingManager.on('peer-offline', (data) => {
@@ -151,6 +160,7 @@ class HybridSignalingManager extends EventEmitter {
                     name: `User-${userId.substring(0, 8)}`,
                     mode: COMMUNICATION_MODE.INTERNET
                 });
+                this.emit('statusChange', { peerId: userId, status: 'connected' });
             });
         });
 

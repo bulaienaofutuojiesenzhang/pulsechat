@@ -33,7 +33,7 @@ class InternetSignalingManager extends EventEmitter {
                 reconnectionAttempts: SIGNALING_SERVER.reconnectionAttempts,
                 reconnectionDelay: SIGNALING_SERVER.reconnectionDelay,
                 timeout: SIGNALING_SERVER.timeout,
-                transports: ['websocket', 'polling'],
+                transports: ['websocket', 'polling'], // 双传输模式提高容错性
             });
 
             this.setupEventListeners();
@@ -205,6 +205,7 @@ class InternetSignalingManager extends EventEmitter {
             this.isConnected = true;
             // 重新注册
             if (this.myUserId) {
+                console.log('[InternetSignaling] 正在重连后重新注册用户身份');
                 this.socket!.emit('register', { userId: this.myUserId });
             }
         });

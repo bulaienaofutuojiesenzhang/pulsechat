@@ -89,6 +89,14 @@ const ChatScreen = () => {
         const handleStatusChange = (data: { peerId: string, status: any }) => {
             if (data.peerId === peerId) {
                 setConnStatus(data.status);
+                setConnMode(hybridSignalingManager.getCurrentMode(data.peerId));
+            }
+        };
+
+        const handlePeerFound = (data: any) => {
+            if (data.id === peerId) {
+                setConnStatus('connected');
+                setConnMode(data.mode);
             }
         };
 
@@ -103,6 +111,7 @@ const ChatScreen = () => {
         p2pService.on('refresh', handleRefresh);
         hybridSignalingManager.on('error', handleSignalingError);
         hybridSignalingManager.on('statusChange', handleStatusChange);
+        hybridSignalingManager.on('peerFound', handlePeerFound);
 
         return () => {
             setActivePeerId(null);
@@ -110,6 +119,7 @@ const ChatScreen = () => {
             p2pService.off('refresh', handleRefresh);
             hybridSignalingManager.off('error', handleSignalingError);
             hybridSignalingManager.off('statusChange', handleStatusChange);
+            hybridSignalingManager.off('peerFound', handlePeerFound);
         };
     }, [peerId, dispatch, profile?.id]);
 
@@ -281,7 +291,13 @@ const ChatScreen = () => {
                     <View style={styles.timeContainer}><Text style={styles.timeText}>{new Date(item.timestamp).getHours()}:{new Date(item.timestamp).getMinutes().toString().padStart(2, '0')}</Text></View>
                 )}
                 <View style={[styles.messageWrapper, item.isMe ? styles.myMessage : styles.theirMessage]}>
-                    <View style={styles.avatarMini}><Text style={{ fontSize: 18 }}>{item.isMe ? '我' : '👥'}</Text></View>
+                    <View style={styles.avatarMini}>
+                        {item.isMe ? (
+                            <Text style={{ fontSize: 14, color: '#fff', fontWeight: '600' }}>我</Text>
+                        ) : (
+                            <Ionicons name="person" size={20} color="#fff" />
+                        )}
+                    </View>
                     <View style={[styles.messageBubble, item.isMe ? styles.myBubble : styles.theirBubble, item.type === 'image' && styles.imageBubble]}>
                         {renderContent()}
                         <View style={[styles.beak, item.isMe ? styles.myBeak : styles.theirBeak]} />
@@ -296,24 +312,52 @@ const ChatScreen = () => {
         const isOnline = connStatus === 'connected';
 
         navigation.setOptions({
-            headerTitle: () => (
-                <TouchableOpacity onPress={handleRename} style={{ alignItems: 'center' }}>
-                    <Text style={{ fontSize: 17, fontWeight: '600', color: isOnline ? '#000' : '#888' }}>
-                        {displayName}
-                    </Text>
-                    <Text style={{ fontSize: 10, color: isOnline ? '#07C160' : '#FA5151' }}>
-                        {isOnline ? `● 在线 (${connMode === COMMUNICATION_MODE.LAN ? '局域网' : '互联网'})` : '○ 寻找节点中...'}
-                    </Text>
-                </TouchableOpacity>
-            ),
-            headerStyle: { backgroundColor: '#EDEDED' },
-            headerShadowVisible: false
+            headerShown: false, // 隐藏原生导航栏，使用自定义 Header 保持一致性
         });
     }, [navigation, peerInfo?.name, peerName, connStatus]);
 
+    const flatListRef = useRef<FlatList>(null);
+
+    const scrollToBottom = () => {
+        setTimeout(() => {
+            flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+    };
+
+    useEffect(() => {
+        if (messages.length > 0) {
+            scrollToBottom();
+        }
+    }, [messages.length]);
+
+    const isOnline = connStatus === 'connected';
+    const displayName = peerInfo?.name || peerName || '聊天';
+
     return (
         <View style={styles.container}>
-            <FlatList data={messages} renderItem={renderItem} keyExtractor={item => item.id} contentContainerStyle={styles.listContent} />
+            {/* 自定义 Header */}
+            <View style={styles.header}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+                    <Ionicons name="chevron-back" size={24} color="#000" />
+                    <Text style={styles.backText}>返回</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleRename} style={styles.headerTitleContainer}>
+                    <Text style={styles.headerTitleText}>{displayName}</Text>
+                    <Text style={[styles.headerStatusText, { color: isOnline ? '#8B7355' : '#FA5151' }]}>
+                        {isOnline ? `● 在线 (${connMode === COMMUNICATION_MODE.LAN ? '局域网' : '互联网'})` : '○ 寻找节点中...'}
+                    </Text>
+                </TouchableOpacity>
+                <View style={styles.placeholder} />
+            </View>
+
+            <FlatList
+                ref={flatListRef}
+                data={messages}
+                renderItem={renderItem}
+                keyExtractor={item => item.id}
+                contentContainerStyle={styles.listContent}
+                onContentSizeChange={() => scrollToBottom()}
+            />
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
                 <View style={styles.inputBar}>
                     <TouchableOpacity style={styles.iconBtn} onPress={() => setIsVoiceMode(!isVoiceMode)}>
@@ -366,13 +410,48 @@ const styles = StyleSheet.create({
     messageWrapper: { flexDirection: 'row', marginBottom: 15, alignItems: 'flex-start' },
     myMessage: { flexDirection: 'row-reverse' },
     theirMessage: { flexDirection: 'row' },
-    avatarMini: { width: 40, height: 40, backgroundColor: '#fff', borderRadius: 4, justifyContent: 'center', alignItems: 'center', marginHorizontal: 8 },
+    avatarMini: { width: 40, height: 40, backgroundColor: '#C19769', borderRadius: 4, justifyContent: 'center', alignItems: 'center', marginHorizontal: 8 },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#EDEDED',
+        paddingHorizontal: 10,
+        paddingVertical: 12,
+        borderBottomWidth: 0.5,
+        borderBottomColor: '#ddd',
+    },
+    backBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 5,
+    },
+    backText: {
+        fontSize: 16,
+        color: '#000',
+    },
+    headerTitleContainer: {
+        alignItems: 'center',
+        flex: 1,
+    },
+    headerTitleText: {
+        fontSize: 17,
+        fontWeight: '600',
+        color: '#000',
+    },
+    headerStatusText: {
+        fontSize: 10,
+        marginTop: 2,
+    },
+    placeholder: {
+        width: 70,
+    },
     messageBubble: { padding: 10, borderRadius: 6, maxWidth: '75%', position: 'relative' },
     imageBubble: { padding: 0, overflow: 'hidden' },
-    myBubble: { backgroundColor: '#95ec69' },
+    myBubble: { backgroundColor: '#D9C5B2' }, // 浅咖啡/金色系
     theirBubble: { backgroundColor: '#fff' },
     beak: { position: 'absolute', top: 12, width: 0, height: 0, borderStyle: 'solid', borderTopWidth: 6, borderBottomWidth: 6, borderTopColor: 'transparent', borderBottomColor: 'transparent' },
-    myBeak: { right: -6, borderLeftWidth: 6, borderLeftColor: '#95ec69' },
+    myBeak: { right: -6, borderLeftWidth: 6, borderLeftColor: '#D9C5B2' },
     theirBeak: { left: -6, borderRightWidth: 6, borderRightColor: '#fff' },
     messageText: { fontSize: 16, lineHeight: 22 },
     myText: { color: '#000' },
@@ -385,7 +464,7 @@ const styles = StyleSheet.create({
     voiceRecordBtn: { flex: 1, height: 36, backgroundColor: '#fff', borderRadius: 6, justifyContent: 'center', alignItems: 'center', marginHorizontal: 8 },
     voiceRecordText: { fontSize: 14, color: '#333' },
     iconBtn: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
-    sendBtn: { backgroundColor: '#07C160', borderRadius: 6, paddingHorizontal: 12, height: 36, justifyContent: 'center', alignItems: 'center' },
+    sendBtn: { backgroundColor: '#C19769', borderRadius: 6, paddingHorizontal: 12, height: 36, justifyContent: 'center', alignItems: 'center' },
     sendBtnText: { color: '#fff', fontSize: 15, fontWeight: '500' },
     morePanel: { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: '#F7F7F7', padding: 15, borderTopWidth: 0.5, borderTopColor: '#eee' },
     panelItem: { alignItems: 'center', width: 70, marginBottom: 15 },

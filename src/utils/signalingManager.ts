@@ -269,9 +269,9 @@ class SignalingManager extends EventEmitter {
                     client.write(JSON.stringify({ type: 'ping', from: this.myId }));
                 } catch (e) { }
 
-                // 检查超时 (20秒没心跳则断开)
+                // 检查超时 (10秒没心跳则断开)
                 const last = this.heartbeats.get(peerId) || 0;
-                if (now - last > 20000) {
+                if (now - last > 10000) {
                     console.log(`[SignalingManager] 与 ${peerId} 心跳超时，关闭连接`);
                     try { client.destroy(); } catch (e) { }
                     this.clients.delete(peerId);
@@ -279,7 +279,7 @@ class SignalingManager extends EventEmitter {
                     this.emit('statusChange', { peerId, status: 'disconnected' });
                 }
             });
-        }, 8000);
+        }, 4000);
 
         try {
             await this.startServer();

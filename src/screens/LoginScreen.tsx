@@ -53,7 +53,7 @@ const LoginScreen = () => {
     return (
         <View style={styles.container}>
             <View style={styles.header}>
-                <Ionicons name="shield-checkmark-outline" size={80} color="#07C160" />
+                <Ionicons name="shield-checkmark-outline" size={80} color="#C19769" />
                 <Text h3 style={styles.title}>PulseChat</Text>
                 <Text style={styles.subtitle}>端到端加密 · 局域网 P2P 通信</Text>
             </View>
@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
         marginBottom: 10,
     },
     mainButton: {
-        backgroundColor: '#07C160',
+        backgroundColor: '#C19769',
         borderRadius: 12,
         paddingVertical: 14,
         marginTop: 20,

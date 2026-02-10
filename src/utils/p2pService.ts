@@ -45,14 +45,10 @@ class P2PService extends EventEmitter {
 
         const success = webrtcManager.sendMessage(to, finalPayload);
         if (!success) {
-            console.log(`[P2P] WebRTC 不可用，降级 TCP 发送`, finalPayload.type);
-            // 检查信令通道是否存在 (包括局域网和互联网)
-            const sigConn = hybridSignalingManager.getConnectionStatus(to) === 'connected';
-            if (sigConn) {
-                this.emit('signal', { to, ...finalPayload });
-                return true;
-            }
-            return false;
+            console.log(`[P2P] WebRTC 不可用,降级到信令通道发送`, finalPayload.type);
+            // 直接通过混合信令管理器发送,忽略本地状态检查以确保尽量发出
+            hybridSignalingManager.sendSignal(to, finalPayload);
+            return true;
         }
         return true;
     }

@@ -159,7 +159,7 @@ const ProfileScreen = () => {
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>安全通信设置</Text>
                     <ListItem bottomDivider onPress={handleSetPassphrase} containerStyle={styles.listItem}>
-                        <Ionicons name="lock-closed-outline" size={20} color="#07C160" />
+                        <Ionicons name="lock-closed-outline" size={20} color="#C19769" />
                         <ListItem.Content>
                             <ListItem.Title style={styles.listTitle}>全局通行密钥 (Passphrase)</ListItem.Title>
                             <ListItem.Subtitle style={styles.keyText}>
@@ -179,7 +179,7 @@ const ProfileScreen = () => {
                         '节点公钥',
                         profile?.publicKey || '',
                         'key-outline',
-                        '#07C160',
+                        '#C19769',
                         false,
                         true,
                         () => { },
@@ -215,7 +215,7 @@ const ProfileScreen = () => {
                         <ListItem.Content>
                             <ListItem.Title style={styles.listTitle}>关于 PulseChat</ListItem.Title>
                         </ListItem.Content>
-                        <ListItem.Chevron />
+                        <Ionicons name="chevron-forward" size={20} color="#C19769" />
                     </ListItem>
                 </View>
 
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
         width: 80,
         height: 80,
         borderRadius: 8,
-        backgroundColor: '#07C160',
+        backgroundColor: '#C19769',
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 15,

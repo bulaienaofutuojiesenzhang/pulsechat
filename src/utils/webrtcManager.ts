@@ -62,6 +62,14 @@ class WebRTCManager extends EventEmitter {
 
     sendMessage(peerId: string, data: any) {
         const dc = this.dataChannels.get(peerId);
+        const pc = this.peers.get(peerId);
+
+        // 检查 PeerConnection 状态,如果失败或断开则返回 false 触发降级
+        if (pc && (pc.connectionState === 'failed' || pc.connectionState === 'disconnected')) {
+            console.log(`[WebRTC] 连接状态异常 (${pc.connectionState}),触发降级`);
+            return false;
+        }
+
         if (dc && dc.readyState === 'open') {
             dc.send(JSON.stringify(data));
             return true;
